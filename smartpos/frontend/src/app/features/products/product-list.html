@@ -1,0 +1,98 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Products</h1>
+      <p>Catalogue, prices and stock levels</p>
+    </div>
+    @if (auth.isAdmin()) {
+      <div class="page-actions">
+        <a routerLink="/products/new" class="btn btn-primary"><app-icon name="plus" [size]="16" /> New product</a>
+      </div>
+    }
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <div class="field grow">
+        <label for="product-search">Search</label>
+        <div class="search-input">
+          <app-icon name="search" [size]="16" />
+          <input id="product-search" type="search" class="input" placeholder="Name or SKU" [formControl]="search">
+        </div>
+      </div>
+      <div class="field">
+        <label for="product-category">Category</label>
+        <select id="product-category" class="select" [formControl]="categoryId">
+          <option [ngValue]="null">All categories</option>
+          @for (c of categories(); track c.id) {
+            <option [ngValue]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    @if (error()) {
+      <div class="card-body"><app-error-alert [message]="error()!" (retry)="load()" /></div>
+    } @else if (loading() && !result()) {
+      <app-loading label="Loading products…" />
+    } @else if (result(); as r) {
+      @if (r.items.length === 0) {
+        @if (hasFilters) {
+          <app-empty-state icon="search" title="No matching products" message="Try a different name, SKU or category." />
+        } @else {
+          <app-empty-state icon="package" title="No products yet" message="Add your first product to start selling.">
+            @if (auth.isAdmin()) {
+              <a routerLink="/products/new" class="btn btn-primary btn-sm">New product</a>
+            }
+          </app-empty-state>
+        }
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col" class="hide-sm">Category</th>
+                <th scope="col" class="num">Price</th>
+                @if (auth.isAdmin()) { <th scope="col" class="num hide-sm">Cost</th> }
+                <th scope="col" class="num">Stock</th>
+                <th scope="col">Status</th>
+                @if (auth.isAdmin()) { <th scope="col" class="actions"><span class="sr-only">Actions</span></th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of r.items; track p.id) {
+                <tr>
+                  <td><div class="cell-title">{{ p.name }}</div><div class="cell-sub mono">{{ p.sku }}</div></td>
+                  <td class="hide-sm">{{ p.categoryName }}</td>
+                  <td class="num">{{ p.sellingPrice | money }}</td>
+                  @if (auth.isAdmin()) { <td class="num hide-sm muted">{{ p.costPrice | money }}</td> }
+                  <td class="num">
+                    <span [class.text-danger]="p.isLowStock">{{ p.stockQuantity }}</span>
+                    @if (p.isLowStock) { <span class="sr-only">(low stock)</span> }
+                  </td>
+                  <td>
+                    @if (p.isActive) { <span class="badge badge-success">Active</span> }
+                    @else { <span class="badge badge-neutral">Inactive</span> }
+                  </td>
+                  @if (auth.isAdmin()) {
+                    <td class="actions">
+                      <a [routerLink]="['/products', p.id, 'edit']" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Edit ' + p.name">
+                        <app-icon name="edit" [size]="16" />
+                      </a>
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="remove(p)" [attr.aria-label]="'Delete ' + p.name">
+                        <app-icon name="trash" [size]="16" />
+                      </button>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-pagination [page]="r.page" [pageSize]="r.pageSize" [totalCount]="r.totalCount" [totalPages]="r.totalPages"
+                        (pageChange)="goToPage($event)" />
+      }
+    }
+  </section>
+</div>

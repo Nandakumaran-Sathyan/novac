@@ -1,0 +1,54 @@
+<div class="login-page">
+  <div class="login-card card">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">S</span>
+      <div>
+        <h1>SmartPOS</h1>
+        <p class="muted">Sign in to continue</p>
+      </div>
+    </div>
+
+    @if (sessionEnded && !error()) {
+      <div class="alert alert-info" role="status">Your session has ended. Please sign in again.</div>
+    }
+    @if (error()) {
+      <div class="alert alert-error" role="alert">
+        <app-icon name="alert" />
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label for="email" class="required">Email</label>
+        <input id="email" type="email" class="input" formControlName="email" autocomplete="username" autofocus
+               [attr.aria-invalid]="invalid('email')" aria-describedby="email-error">
+        @if (invalid('email')) {
+          <span id="email-error" class="field-error">Enter a valid email address.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="password" class="required">Password</label>
+        <div class="password">
+          <input id="password" class="input" formControlName="password" autocomplete="current-password"
+                 [type]="showPassword() ? 'text' : 'password'"
+                 [attr.aria-invalid]="invalid('password')" aria-describedby="password-error">
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="showPassword.set(!showPassword())"
+                  [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showPassword()">
+            <app-icon name="eye" [size]="16" />
+          </button>
+        </div>
+        @if (invalid('password')) {
+          <span id="password-error" class="field-error">Enter your password.</span>
+        }
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="submitting()">
+        {{ submitting() ? 'Signing in…' : 'Sign in' }}
+      </button>
+    </form>
+
+    <p class="hint footer-hint">Accounts are created by an administrator. Ask your admin if you need access.</p>
+  </div>
+</div>

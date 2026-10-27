@@ -1,0 +1,31 @@
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--color-bg);
+}
+.login-card {
+  width: min(400px, 100%);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+form { display: flex; flex-direction: column; gap: 16px; }
+.password { position: relative; }
+.password .input { padding-right: 40px; }
+.password .btn { position: absolute; right: 3px; top: 3px; }
+.footer-hint { text-align: center; }

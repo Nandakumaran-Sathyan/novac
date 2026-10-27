@@ -1,0 +1,28 @@
+# ---- Secrets / local config ----
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+*.pfx
+*.pem
+
+# ---- .NET ----
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+.vs/
+*.trx
+coverage*/
+
+# ---- Node / Angular ----
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+
+# ---- Editors / OS ----
+.idea/
+.DS_Store
+Thumbs.db

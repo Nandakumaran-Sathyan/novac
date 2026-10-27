@@ -1,0 +1,127 @@
+<div class="pos">
+  <section class="catalog" aria-labelledby="catalog-heading">
+    <div class="catalog-header">
+      <h1 id="catalog-heading">Point of Sale</h1>
+      <div class="search-input">
+        <app-icon name="search" [size]="16" />
+        <label for="pos-search" class="sr-only">Search products</label>
+        <input #searchInput id="pos-search" type="search" class="input input-lg" autocomplete="off" autofocus
+               placeholder="Search name or scan SKU — press Enter to add" [formControl]="search"
+               (keydown.enter)="addFromSearch($event)">
+      </div>
+      <p class="hint">Shortcuts: <kbd>/</kbd> search · <kbd>Enter</kbd> add match · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> complete sale</p>
+    </div>
+
+    @if (productsError()) {
+      <app-error-alert [message]="productsError()!" (retry)="loadProducts()" />
+    } @else if (loadingProducts() && products().length === 0) {
+      <app-loading label="Loading products…" />
+    } @else if (products().length === 0) {
+      <app-empty-state icon="search" title="No products found"
+                       [message]="search.value ? 'Nothing matches “' + search.value + '”.' : 'Add active products to start selling.'" />
+    } @else {
+      <ul class="product-grid" [class.dimmed]="loadingProducts()">
+        @for (p of products(); track p.id) {
+          <li>
+            <button type="button" class="product-tile" (click)="add(p)" [disabled]="p.stockQuantity - inCart(p.id) <= 0"
+                    [attr.aria-label]="'Add ' + p.name + ', ' + (p.sellingPrice | money) + ', ' + p.stockQuantity + ' in stock'">
+              <span class="tile-name">{{ p.name }}</span>
+              <span class="tile-sku mono">{{ p.sku }}</span>
+              <span class="tile-bottom">
+                <span class="tile-price">{{ p.sellingPrice | money }}</span>
+                @if (p.stockQuantity <= 0) {
+                  <span class="badge badge-danger">Out of stock</span>
+                } @else {
+                  <span class="badge" [class.badge-warning]="p.isLowStock" [class.badge-neutral]="!p.isLowStock">{{ p.stockQuantity }} left</span>
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <aside class="cart card" aria-labelledby="cart-heading">
+    <div class="card-header">
+      <h2 id="cart-heading">Current sale <span class="muted">({{ itemCount() }} {{ itemCount() === 1 ? 'item' : 'items' }})</span></h2>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="clearCart()" [disabled]="lines().length === 0">Clear</button>
+    </div>
+
+    @if (completedSale(); as sale) {
+      <div class="sale-complete" role="status">
+        <span class="complete-icon"><app-icon name="check" [size]="26" /></span>
+        <h3>Sale completed</h3>
+        <p class="mono">{{ sale.invoiceNumber }}</p>
+        <p class="complete-total">{{ sale.total | money }}</p>
+        <p class="muted">Paid by {{ sale.paymentMethod }}</p>
+        <div class="complete-actions">
+          <a [routerLink]="['/sales', sale.id]" [queryParams]="{ print: 1 }" class="btn btn-secondary"><app-icon name="printer" [size]="16" /> Print invoice</a>
+          <button type="button" class="btn btn-primary" (click)="newSale()">New sale</button>
+        </div>
+      </div>
+    } @else {
+      <div class="cart-lines">
+        @if (lines().length === 0) {
+          <app-empty-state icon="cart" title="Cart is empty" message="Search or tap a product to add it." />
+        } @else {
+          <ul>
+            @for (line of lines(); track line.productId) {
+              <li class="cart-line">
+                <div class="line-info">
+                  <span class="cell-title">{{ line.name }}</span>
+                  <span class="cell-sub">{{ line.unitPrice | money }} each</span>
+                </div>
+                <div class="qty" role="group" [attr.aria-label]="'Quantity for ' + line.name">
+                  <button type="button" class="btn btn-secondary btn-icon btn-sm" (click)="changeQuantity(line, line.quantity - 1)"
+                          [disabled]="line.quantity <= 1" aria-label="Decrease quantity"><app-icon name="minus" [size]="14" /></button>
+                  <input type="number" class="input qty-input" min="1" [max]="line.available" step="1" [value]="line.quantity"
+                         (change)="onQuantityInput(line, $event)" aria-label="Quantity">
+                  <button type="button" class="btn btn-secondary btn-icon btn-sm" (click)="changeQuantity(line, line.quantity + 1)"
+                          [disabled]="line.quantity >= line.available" aria-label="Increase quantity"><app-icon name="plus" [size]="14" /></button>
+                </div>
+                <span class="line-total num">{{ lineTotal(line) | money }}</span>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="remove(line)" [attr.aria-label]="'Remove ' + line.name">
+                  <app-icon name="trash" [size]="16" />
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="checkout">
+        @if (checkoutError()) {
+          <app-error-alert [message]="checkoutError()!" [retryable]="false" />
+        }
+        <div class="checkout-row">
+          <div class="field">
+            <label for="discount">Discount %</label>
+            <input id="discount" type="number" class="input" min="0" [max]="maxDiscount()" step="0.5" [value]="discountPercent()"
+                   (input)="onDiscountInput($event)" [attr.aria-invalid]="discountInvalid()" aria-describedby="discount-help">
+            <span id="discount-help" class="hint" [class.field-error]="discountInvalid()">Max {{ maxDiscount() }}% for your role</span>
+          </div>
+          <div class="field">
+            <span class="field-label" id="payment-label">Payment</span>
+            <div class="segmented" role="group" aria-labelledby="payment-label">
+              @for (m of paymentMethods; track m) {
+                <button type="button" [attr.aria-pressed]="paymentMethod() === m" (click)="paymentMethod.set(m)">{{ m }}</button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <dl class="totals">
+          <div><dt>Subtotal</dt><dd>{{ totals().subtotal | money }}</dd></div>
+          <div><dt>Discount</dt><dd>−{{ totals().discountAmount | money }}</dd></div>
+          <div><dt>Tax ({{ taxRate() }}%)</dt><dd>{{ totals().taxAmount | money }}</dd></div>
+          <div class="grand"><dt>Total</dt><dd>{{ totals().total | money }}</dd></div>
+        </dl>
+
+        <button type="button" class="btn btn-primary btn-lg btn-block" (click)="checkout()" [disabled]="!canCheckout()">
+          {{ submitting() ? 'Processing…' : 'Complete sale · ' + (totals().total | money) }}
+        </button>
+      </div>
+    }
+  </aside>
+</div>

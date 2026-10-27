@@ -1,0 +1,74 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Sales</h1>
+      <p>{{ auth.isAdmin() ? 'All transactions' : 'Your transactions' }}</p>
+    </div>
+    <div class="page-actions">
+      <a routerLink="/pos" class="btn btn-primary">New sale</a>
+    </div>
+  </div>
+
+  <section class="card">
+    <form class="toolbar" [formGroup]="filters" (ngSubmit)="apply()">
+      <div class="field">
+        <label for="sales-from">From</label>
+        <input id="sales-from" type="date" class="input" formControlName="from">
+      </div>
+      <div class="field">
+        <label for="sales-to">To</label>
+        <input id="sales-to" type="date" class="input" formControlName="to">
+      </div>
+      <div class="field grow">
+        <label for="sales-search">Invoice number</label>
+        <input id="sales-search" type="search" class="input mono" formControlName="search" placeholder="INV-…">
+      </div>
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <button type="button" class="btn btn-secondary" (click)="preset(1)">Today</button>
+      <button type="button" class="btn btn-secondary" (click)="preset(7)">7 days</button>
+      <button type="button" class="btn btn-ghost" (click)="clear()">Clear</button>
+    </form>
+    @if (rangeError()) {
+      <div class="card-body"><span class="field-error" role="alert">{{ rangeError() }}</span></div>
+    }
+
+    @if (error()) {
+      <div class="card-body"><app-error-alert [message]="error()!" (retry)="load()" /></div>
+    } @else if (loading() && !result()) {
+      <app-loading label="Loading sales…" />
+    } @else if (result(); as r) {
+      @if (r.items.length === 0) {
+        <app-empty-state icon="receipt" title="No sales found" message="Completed sales appear here. Try widening the date range." />
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Invoice</th>
+                <th scope="col">Date</th>
+                <th scope="col" class="hide-sm">Cashier</th>
+                <th scope="col" class="num hide-sm">Items</th>
+                <th scope="col" class="hide-sm">Payment</th>
+                <th scope="col" class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of r.items; track s.id) {
+                <tr>
+                  <td><a [routerLink]="['/sales', s.id]" class="mono">{{ s.invoiceNumber }}</a></td>
+                  <td class="nowrap">{{ s.createdAt | date: 'MMM d, y, h:mm a' }}</td>
+                  <td class="hide-sm">{{ s.cashierName }}</td>
+                  <td class="num hide-sm">{{ s.itemCount }}</td>
+                  <td class="hide-sm">{{ s.paymentMethod }}</td>
+                  <td class="num">{{ s.total | money }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-pagination [page]="r.page" [pageSize]="r.pageSize" [totalCount]="r.totalCount" [totalPages]="r.totalPages"
+                        (pageChange)="goToPage($event)" />
+      }
+    }
+  </section>
+</div>

@@ -1,0 +1,60 @@
+<div class="page invoice-page">
+  <div class="page-header no-print">
+    <a routerLink="/sales" class="btn btn-ghost"><app-icon name="chevronLeft" [size]="16" /> Back to sales</a>
+    @if (sale()) {
+      <div class="page-actions">
+        <a routerLink="/pos" class="btn btn-secondary">New sale</a>
+        <button type="button" class="btn btn-primary" (click)="printInvoice()"><app-icon name="printer" [size]="16" /> Print</button>
+      </div>
+    }
+  </div>
+
+  @if (error()) {
+    <app-error-alert [message]="error()!" (retry)="load()" />
+  } @else if (!sale()) {
+    <app-loading label="Loading invoice…" />
+  } @else {
+    @let s = sale()!;
+    <article class="card invoice" aria-label="Invoice">
+      <header class="invoice-header">
+        <div>
+          <h1>{{ settings.storeName() }}</h1>
+          <p class="muted">Tax invoice</p>
+        </div>
+        <dl class="invoice-meta">
+          <div><dt>Invoice</dt><dd class="mono">{{ s.invoiceNumber }}</dd></div>
+          <div><dt>Date</dt><dd>{{ s.createdAt | date: 'MMM d, y, h:mm a' }}</dd></div>
+          <div><dt>Cashier</dt><dd>{{ s.cashierName }}</dd></div>
+          <div><dt>Payment</dt><dd>{{ s.paymentMethod }}</dd></div>
+        </dl>
+      </header>
+
+      <table class="table invoice-table">
+        <thead>
+          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num">Amount</th></tr>
+        </thead>
+        <tbody>
+          @for (item of s.items; track item.id) {
+            <tr>
+              <td><div class="cell-title">{{ item.productName }}</div><div class="cell-sub mono">{{ item.sku }}</div></td>
+              <td class="num">{{ item.quantity }}</td>
+              <td class="num">{{ item.unitPrice | money }}</td>
+              <td class="num">{{ item.lineTotal | money }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <dl class="invoice-totals">
+        <div><dt>Subtotal</dt><dd>{{ s.subtotal | money }}</dd></div>
+        @if (s.discountAmount > 0) {
+          <div><dt>Discount ({{ s.discountPercent }}%)</dt><dd>−{{ s.discountAmount | money }}</dd></div>
+        }
+        <div><dt>Tax ({{ s.taxRatePercent }}%)</dt><dd>{{ s.taxAmount | money }}</dd></div>
+        <div class="grand"><dt>Total</dt><dd>{{ s.total | money }}</dd></div>
+      </dl>
+
+      <footer class="invoice-footer muted">Thank you for shopping with us.</footer>
+    </article>
+  }
+</div>

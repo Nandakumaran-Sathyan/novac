@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SmartPOS.Core\SmartPOS.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Provider-agnostic EF Core only (DbSet, LINQ, transactions). The MySQL provider lives in Infrastructure. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- Options binding/validation, logging abstractions and DI used by the services. -->
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartPOS.UnitTests" />
+  </ItemGroup>
+</Project>

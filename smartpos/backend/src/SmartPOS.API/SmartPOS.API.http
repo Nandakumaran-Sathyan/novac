@@ -1,0 +1,31 @@
+# Requests for the VS Code REST Client / JetBrains HTTP client.
+# Log in first, then copy accessToken into @token.
+@baseUrl = http://localhost:5080
+@token = paste-access-token-here
+
+GET {{baseUrl}}/health
+
+###
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "your-password" }
+
+###
+GET {{baseUrl}}/api/dashboard/summary
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/api/products?search=milk&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+###
+POST {{baseUrl}}/api/sales
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "items": [ { "productId": 1, "quantity": 2 } ], "discountPercent": 0, "paymentMethod": "Cash" }
+
+###
+GET {{baseUrl}}/api/reports/daily-sales?from=2026-10-01&to=2026-10-31
+Authorization: Bearer {{token}}

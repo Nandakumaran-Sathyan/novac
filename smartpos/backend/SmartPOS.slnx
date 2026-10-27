@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SmartPOS.API/SmartPOS.API.csproj" />
+    <Project Path="src/SmartPOS.Application/SmartPOS.Application.csproj" />
+    <Project Path="src/SmartPOS.Core/SmartPOS.Core.csproj" />
+    <Project Path="src/SmartPOS.Infrastructure/SmartPOS.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SmartPOS.IntegrationTests/SmartPOS.IntegrationTests.csproj" />
+    <Project Path="tests/SmartPOS.UnitTests/SmartPOS.UnitTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,92 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Reports</h1>
+      <p>Sales summaries calculated from recorded transactions</p>
+    </div>
+  </div>
+
+  <section class="card">
+    <form class="toolbar" [formGroup]="range" (ngSubmit)="load()">
+      <div class="field">
+        <label for="report-from">From</label>
+        <input id="report-from" type="date" class="input" formControlName="from">
+      </div>
+      <div class="field">
+        <label for="report-to">To</label>
+        <input id="report-to" type="date" class="input" formControlName="to">
+      </div>
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <button type="button" class="btn btn-secondary" (click)="preset(7)">Last 7 days</button>
+      <button type="button" class="btn btn-secondary" (click)="preset(30)">Last 30 days</button>
+    </form>
+  </section>
+
+  @if (error()) {
+    <app-error-alert [message]="error()!" (retry)="load()" />
+  } @else if (loading() && !daily()) {
+    <app-loading label="Loading reports…" />
+  } @else if (daily(); as d) {
+    <section class="stats-grid stats-3" aria-label="Period totals">
+      <app-stat-card label="Total sales" [value]="d.total | money" icon="banknote" />
+      <app-stat-card label="Transactions" [value]="d.transactionCount" icon="receipt" />
+      <app-stat-card label="Average sale" [value]="d.averageSale | money" icon="trend" />
+    </section>
+
+    <div class="grid-2">
+      <section class="card" aria-labelledby="daily-heading">
+        <div class="card-header"><h2 id="daily-heading">Daily sales</h2></div>
+        @if (d.transactionCount === 0) {
+          <app-empty-state icon="chart" title="No sales in this period" message="Daily totals appear once sales are recorded." />
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Date</th><th scope="col" class="num">Sales</th><th scope="col" class="num hide-sm">Tax</th><th scope="col" class="num">Total</th><th scope="col" class="bar-col"><span class="sr-only">Relative total</span></th></tr>
+              </thead>
+              <tbody>
+                @for (day of d.days; track day.date) {
+                  <tr>
+                    <td class="nowrap">{{ day.date | date: 'EEE, MMM d' }}</td>
+                    <td class="num">{{ day.transactionCount }}</td>
+                    <td class="num hide-sm">{{ day.taxAmount | money }}</td>
+                    <td class="num">{{ day.total | money }}</td>
+                    <td class="bar-col"><span class="bar" [style.width]="barWidth(day.total)" aria-hidden="true"></span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="top-heading">
+        <div class="card-header">
+          <h2 id="top-heading">Top products</h2>
+          <span class="hint">Revenue before sale-level discounts</span>
+        </div>
+        @if (topProducts().length === 0) {
+          <app-empty-state icon="package" title="No products sold in this period" />
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Product</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Revenue</th><th scope="col" class="num hide-sm">Gross profit</th></tr>
+              </thead>
+              <tbody>
+                @for (p of topProducts(); track p.productId) {
+                  <tr>
+                    <td><div class="cell-title">{{ p.productName }}</div><div class="cell-sub mono">{{ p.sku }}</div></td>
+                    <td class="num">{{ p.quantitySold }}</td>
+                    <td class="num">{{ p.revenue | money }}</td>
+                    <td class="num hide-sm">{{ p.grossProfit | money }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</div>

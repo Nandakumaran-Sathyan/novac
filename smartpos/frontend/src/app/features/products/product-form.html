@@ -1,0 +1,108 @@
+<div class="page form-page">
+  <div class="page-header">
+    <div>
+      <h1>{{ isEdit() ? 'Edit product' : 'New product' }}</h1>
+      <p>{{ isEdit() ? 'Update details and pricing. Use Inventory to change stock.' : 'Add a product to the catalogue.' }}</p>
+    </div>
+  </div>
+
+  @if (loadError()) {
+    <app-error-alert [message]="loadError()!" (retry)="loadProduct()" />
+  } @else if (loading()) {
+    <app-loading label="Loading product…" />
+  } @else {
+    <form class="card" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <div class="card-body">
+        @if (saveError()) {
+          <app-error-alert [message]="saveError()!" [retryable]="false" style="margin-bottom: 16px" />
+        }
+        <div class="form-grid">
+          <div class="field">
+            <label for="sku" class="required">SKU</label>
+            <input id="sku" class="input mono" formControlName="sku" autocomplete="off" [attr.aria-invalid]="invalid('sku')" aria-describedby="sku-help">
+            @if (invalid('sku')) {
+              <span class="field-error">2–50 characters: letters, digits, “.”, “_” or “-”.</span>
+            } @else {
+              <span id="sku-help" class="hint">Unique code; stored in upper case.</span>
+            }
+          </div>
+
+          <div class="field">
+            <label for="name" class="required">Name</label>
+            <input id="name" class="input" formControlName="name" [attr.aria-invalid]="invalid('name')">
+            @if (invalid('name')) { <span class="field-error">Name must be 2–150 characters.</span> }
+          </div>
+
+          <div class="field span-2">
+            <label for="category" class="required">Category</label>
+            <div class="category-row">
+              <select id="category" class="select" formControlName="categoryId" [attr.aria-invalid]="invalid('categoryId')">
+                <option [ngValue]="null" disabled>Select a category</option>
+                @for (c of categories(); track c.id) {
+                  <option [ngValue]="c.id">{{ c.name }}</option>
+                }
+              </select>
+              <button type="button" class="btn btn-secondary" (click)="addingCategory.set(!addingCategory())" [attr.aria-expanded]="addingCategory()">
+                New category
+              </button>
+            </div>
+            @if (invalid('categoryId')) { <span class="field-error">Select a category.</span> }
+            @if (addingCategory()) {
+              <div class="category-row">
+                <label for="new-category" class="sr-only">New category name</label>
+                <input id="new-category" class="input" placeholder="Category name" [formControl]="newCategoryName" (keydown.enter)="$event.preventDefault(); addCategory()">
+                <button type="button" class="btn btn-primary" (click)="addCategory()">Add</button>
+              </div>
+            }
+          </div>
+
+          <div class="field">
+            <label for="sellingPrice" class="required">Selling price</label>
+            <input id="sellingPrice" type="number" inputmode="decimal" min="0" step="0.01" class="input" formControlName="sellingPrice" [attr.aria-invalid]="invalid('sellingPrice')">
+            @if (invalid('sellingPrice')) { <span class="field-error">Enter a price of 0 or more with at most 2 decimals.</span> }
+          </div>
+
+          <div class="field">
+            <label for="costPrice" class="required">Cost price</label>
+            <input id="costPrice" type="number" inputmode="decimal" min="0" step="0.01" class="input" formControlName="costPrice" [attr.aria-invalid]="invalid('costPrice')">
+            @if (invalid('costPrice')) { <span class="field-error">Enter a cost of 0 or more with at most 2 decimals.</span> }
+          </div>
+
+          <div class="field">
+            @if (isEdit()) {
+              <span class="field-label">Stock on hand</span>
+              <input class="input" [value]="currentStock()" disabled aria-label="Stock on hand">
+              <span class="hint">Change stock from Inventory so every change is recorded.</span>
+            } @else {
+              <label for="initialStock" class="required">Opening stock</label>
+              <input id="initialStock" type="number" inputmode="numeric" min="0" step="1" class="input" formControlName="initialStock" [attr.aria-invalid]="invalid('initialStock')">
+              @if (invalid('initialStock')) { <span class="field-error">Enter a whole number of 0 or more.</span> }
+            }
+          </div>
+
+          <div class="field">
+            <label for="reorderLevel" class="required">Reorder level</label>
+            <input id="reorderLevel" type="number" inputmode="numeric" min="0" step="1" class="input" formControlName="reorderLevel" [attr.aria-invalid]="invalid('reorderLevel')" aria-describedby="reorder-help">
+            @if (invalid('reorderLevel')) { <span class="field-error">Enter a whole number of 0 or more.</span> }
+            @else { <span id="reorder-help" class="hint">Flagged as low stock at or below this quantity.</span> }
+          </div>
+
+          <div class="field span-2">
+            <label for="description">Description</label>
+            <textarea id="description" class="textarea" formControlName="description" rows="3"></textarea>
+          </div>
+
+          @if (isEdit()) {
+            <div class="field span-2">
+              <label class="checkbox"><input type="checkbox" formControlName="isActive"> Active (available in the POS)</label>
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a routerLink="/products" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">{{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create product' }}</button>
+      </div>
+    </form>
+  }
+</div>

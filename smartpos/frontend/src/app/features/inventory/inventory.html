@@ -1,0 +1,131 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Inventory</h1>
+      <p>Current stock levels, most urgent first</p>
+    </div>
+    <div class="page-actions">
+      <a routerLink="/inventory/movements" class="btn btn-secondary"><app-icon name="history" [size]="16" /> Movement history</a>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <div class="field grow">
+        <label for="inventory-search">Search</label>
+        <div class="search-input">
+          <app-icon name="search" [size]="16" />
+          <input id="inventory-search" type="search" class="input" placeholder="Name or SKU" [formControl]="search">
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="stock-filter-label">Show</span>
+        <div class="segmented" role="group" aria-labelledby="stock-filter-label">
+          @for (f of filters; track f.value) {
+            <button type="button" [attr.aria-pressed]="filter() === f.value" (click)="setFilter(f.value)">{{ f.label }}</button>
+          }
+        </div>
+      </div>
+    </div>
+
+    @if (error()) {
+      <div class="card-body"><app-error-alert [message]="error()!" (retry)="load()" /></div>
+    } @else if (loading() && !result()) {
+      <app-loading label="Loading inventory…" />
+    } @else if (result(); as r) {
+      @if (r.items.length === 0) {
+        @if (filter() !== 'All') {
+          <app-empty-state icon="check" title="Nothing to restock" message="No active product matches this stock filter." />
+        } @else {
+          <app-empty-state icon="layers" title="No products found" message="Products you add will appear here with their stock levels." />
+        }
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col" class="hide-sm">Category</th>
+                <th scope="col" class="num">On hand</th>
+                <th scope="col" class="num hide-sm">Reorder at</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="hide-sm">Updated</th>
+                <th scope="col" class="actions"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of r.items; track item.productId) {
+                <tr>
+                  <td><div class="cell-title">{{ item.name }}</div><div class="cell-sub mono">{{ item.sku }}</div></td>
+                  <td class="hide-sm">{{ item.categoryName }}</td>
+                  <td class="num">{{ item.stockQuantity }}</td>
+                  <td class="num hide-sm">{{ item.reorderLevel }}</td>
+                  <td><app-stock-badge [status]="item.status" /></td>
+                  <td class="hide-sm nowrap muted">{{ item.updatedAt | date: 'MMM d, h:mm a' }}</td>
+                  <td class="actions">
+                    <a [routerLink]="['/inventory/movements']" [queryParams]="{ productId: item.productId }" class="btn btn-ghost btn-sm"
+                       [attr.aria-label]="'Stock history for ' + item.name">History</a>
+                    @if (auth.isAdmin()) {
+                      <button type="button" class="btn btn-secondary btn-sm" (click)="openAdjust(item)">Adjust</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-pagination [page]="r.page" [pageSize]="r.pageSize" [totalCount]="r.totalCount" [totalPages]="r.totalPages"
+                        (pageChange)="goToPage($event)" />
+      }
+    }
+  </section>
+</div>
+
+<app-modal [open]="!!adjusting()" title="Adjust stock" [busy]="saving()" (closed)="closeAdjust()">
+  @if (adjusting(); as item) {
+    <form [formGroup]="adjustForm" (ngSubmit)="submitAdjust()" novalidate>
+      <div class="modal-body">
+        <div>
+          <div class="cell-title">{{ item.name }}</div>
+          <div class="cell-sub"><span class="mono">{{ item.sku }}</span> · {{ item.stockQuantity }} on hand</div>
+        </div>
+        @if (adjustError()) {
+          <app-error-alert [message]="adjustError()!" [retryable]="false" />
+        }
+        <div class="form-grid">
+          <div class="field">
+            <label for="adjust-direction">Change</label>
+            <select id="adjust-direction" class="select" formControlName="direction">
+              <option value="add">Add stock</option>
+              <option value="remove">Remove stock</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="adjust-quantity" class="required">Quantity</label>
+            <input id="adjust-quantity" type="number" inputmode="numeric" min="1" step="1" class="input" formControlName="quantity"
+                   [attr.aria-invalid]="adjustInvalid('quantity')">
+            @if (adjustInvalid('quantity')) { <span class="field-error">Enter a whole number of at least 1.</span> }
+          </div>
+          <div class="field span-2">
+            <label for="adjust-reason" class="required">Reason</label>
+            <input id="adjust-reason" class="input" formControlName="reason" list="adjust-reasons" maxlength="250"
+                   placeholder="e.g. Delivery received" [attr.aria-invalid]="adjustInvalid('reason')">
+            <datalist id="adjust-reasons">
+              @for (r of reasons; track r) { <option [value]="r"></option> }
+            </datalist>
+            @if (adjustInvalid('reason')) { <span class="field-error">A reason of at least 3 characters is required.</span> }
+          </div>
+        </div>
+        @if (newQuantity() !== null) {
+          <p [class.text-danger]="newQuantity()! < 0">
+            New stock level: <strong>{{ newQuantity() }}</strong>
+          </p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeAdjust()" [disabled]="saving()">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Record adjustment' }}</button>
+      </div>
+    </form>
+  }
+</app-modal>

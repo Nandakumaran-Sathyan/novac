@@ -1,0 +1,87 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Stock movements</h1>
+      <p>{{ productName() ? 'History for ' + productName() : 'Every stock change: opening stock, sales and adjustments' }}</p>
+    </div>
+    <div class="page-actions">
+      @if (productId()) {
+        <a routerLink="/inventory/movements" class="btn btn-secondary">All products</a>
+      }
+      <a routerLink="/inventory" class="btn btn-secondary"><app-icon name="layers" [size]="16" /> Stock levels</a>
+    </div>
+  </div>
+
+  <section class="card">
+    <form class="toolbar" [formGroup]="filters" (ngSubmit)="apply()">
+      <div class="field">
+        <label for="movement-type">Type</label>
+        <select id="movement-type" class="select" formControlName="type">
+          <option value="">All types</option>
+          <option value="InitialStock">Opening stock</option>
+          <option value="Sale">Sale</option>
+          <option value="Adjustment">Adjustment</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="movement-from">From</label>
+        <input id="movement-from" type="date" class="input" formControlName="from">
+      </div>
+      <div class="field">
+        <label for="movement-to">To</label>
+        <input id="movement-to" type="date" class="input" formControlName="to">
+      </div>
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <button type="button" class="btn btn-ghost" (click)="clear()">Clear</button>
+    </form>
+
+    @if (error()) {
+      <div class="card-body"><app-error-alert [message]="error()!" (retry)="load()" /></div>
+    } @else if (loading() && !result()) {
+      <app-loading label="Loading movements…" />
+    } @else if (result(); as r) {
+      @if (r.items.length === 0) {
+        <app-empty-state icon="history" title="No stock movements" message="Nothing matches these filters." />
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Product</th>
+                <th scope="col">Type</th>
+                <th scope="col" class="num">Change</th>
+                <th scope="col" class="num">After</th>
+                <th scope="col" class="hide-sm">Reason</th>
+                <th scope="col" class="hide-sm">By</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of r.items; track m.id) {
+                <tr>
+                  <td class="nowrap">{{ m.createdAt | date: 'MMM d, y, h:mm a' }}</td>
+                  <td><div class="cell-title">{{ m.productName }}</div><div class="cell-sub mono">{{ m.sku }}</div></td>
+                  <td><app-movement-badge [type]="m.type" /></td>
+                  <td class="num" [class.text-success]="m.quantityChange > 0" [class.text-danger]="m.quantityChange < 0">
+                    {{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}
+                  </td>
+                  <td class="num">{{ m.quantityAfter }}</td>
+                  <td class="hide-sm">
+                    @if (m.saleId) {
+                      <a [routerLink]="['/sales', m.saleId]" class="mono">{{ m.invoiceNumber }}</a>
+                    } @else {
+                      {{ m.reason }}
+                    }
+                  </td>
+                  <td class="hide-sm muted">{{ m.userName ?? 'System' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-pagination [page]="r.page" [pageSize]="r.pageSize" [totalCount]="r.totalCount" [totalPages]="r.totalPages"
+                        (pageChange)="goToPage($event)" />
+      }
+    }
+  </section>
+</div>

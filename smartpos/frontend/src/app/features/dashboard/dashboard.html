@@ -1,0 +1,92 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Dashboard</h1>
+      <p>Today's activity{{ summary() ? ' · ' + (summary()!.date | date: 'fullDate') : '' }}</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [size]="16" /> Refresh
+      </button>
+      <a routerLink="/pos" class="btn btn-primary"><app-icon name="cart" [size]="16" /> New sale</a>
+    </div>
+  </div>
+
+  @if (error()) {
+    <app-error-alert [message]="error()!" (retry)="load()" />
+  }
+
+  @if (loading() && !summary()) {
+    <app-loading label="Loading dashboard…" />
+  } @else if (summary(); as s) {
+    <section class="stats-grid" aria-label="Key figures">
+      <app-stat-card label="Today's sales" [value]="s.todaySalesTotal | money" icon="banknote" />
+      <app-stat-card label="Transactions today" [value]="s.todayTransactionCount" icon="receipt" />
+      <app-stat-card label="Active products" [value]="s.productCount" icon="package" />
+      <app-stat-card label="Low-stock products" [value]="s.lowStockCount" icon="warning"
+                     [tone]="s.lowStockCount > 0 ? 'warning' : 'default'" hint="At or below reorder level" />
+    </section>
+
+    <div class="grid-2">
+      <section class="card" aria-labelledby="recent-heading">
+        <div class="card-header">
+          <h2 id="recent-heading">Recent transactions</h2>
+          <a routerLink="/sales" class="btn btn-ghost btn-sm">View all</a>
+        </div>
+        @if (s.recentTransactions.length === 0) {
+          <app-empty-state icon="receipt" title="No sales yet"
+                           message="Completed sales from the Point of Sale screen will appear here.">
+            <a routerLink="/pos" class="btn btn-primary btn-sm">Start a sale</a>
+          </app-empty-state>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Invoice</th><th scope="col" class="hide-sm">Cashier</th><th scope="col">Time</th><th scope="col" class="num">Total</th></tr>
+              </thead>
+              <tbody>
+                @for (sale of s.recentTransactions; track sale.id) {
+                  <tr>
+                    <td><a [routerLink]="['/sales', sale.id]" class="mono">{{ sale.invoiceNumber }}</a></td>
+                    <td class="hide-sm">{{ sale.cashierName }}</td>
+                    <td class="nowrap">{{ sale.createdAt | date: 'MMM d, h:mm a' }}</td>
+                    <td class="num">{{ sale.total | money }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="low-heading">
+        <div class="card-header">
+          <h2 id="low-heading">Low-stock products</h2>
+          <a routerLink="/inventory" [queryParams]="{ filter: 'Low' }" class="btn btn-ghost btn-sm">View inventory</a>
+        </div>
+        @if (s.lowStockProducts.length === 0) {
+          <app-empty-state icon="check" title="Stock levels look good"
+                           message="No active product is at or below its reorder level." />
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Product</th><th scope="col" class="num">On hand</th><th scope="col" class="num hide-sm">Reorder at</th><th scope="col">Status</th></tr>
+              </thead>
+              <tbody>
+                @for (item of s.lowStockProducts; track item.productId) {
+                  <tr>
+                    <td><div class="cell-title">{{ item.name }}</div><div class="cell-sub mono">{{ item.sku }}</div></td>
+                    <td class="num">{{ item.stockQuantity }}</td>
+                    <td class="num hide-sm">{{ item.reorderLevel }}</td>
+                    <td><app-stock-badge [status]="item.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</div>

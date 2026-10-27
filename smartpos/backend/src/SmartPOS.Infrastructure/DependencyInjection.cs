@@ -1,0 +1,37 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using SmartPOS.Application.Auth;
+using SmartPOS.Application.Common;
+using SmartPOS.Infrastructure.Persistence;
+using SmartPOS.Infrastructure.Security;
+
+namespace SmartPOS.Infrastructure;
+
+public static class DependencyInjection
+{
+    public const string ConnectionStringName = "SmartPos";
+
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContext<SmartPosDbContext>(options =>
+        {
+            // Read lazily (when the first DbContext is created) so a missing value produces a clear
+            // error instead of a failed connection attempt, and so tests can swap the provider.
+            var connectionString = configuration.GetConnectionString(ConnectionStringName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new InvalidOperationException(
+                    $"ConnectionStrings:{ConnectionStringName} is not configured. Set it with `dotnet user-secrets` " +
+                    $"or the ConnectionStrings__{ConnectionStringName} environment variable (see docs/DATABASE.md).");
+            options.UseMySQL(connectionString);
+        });
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<SmartPosDbContext>());
+
+        services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
+        services.Configure<BootstrapAdminOptions>(configuration.GetSection(BootstrapAdminOptions.SectionName));
+        services.AddScoped<DatabaseInitializer>();
+
+        services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
+        return services;
+    }
+}
