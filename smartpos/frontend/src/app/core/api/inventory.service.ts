@@ -6,6 +6,7 @@ import { InventoryFilter, InventoryItem, PagedResult, PageQuery, StockMovement, 
 
 export interface InventoryQuery extends PageQuery {
   search?: string;
+  category?: string | null;
   filter?: InventoryFilter;
 }
 

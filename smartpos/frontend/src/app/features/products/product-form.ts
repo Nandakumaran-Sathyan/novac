@@ -36,18 +36,18 @@ export class ProductForm implements OnInit {
   protected readonly loadError = signal<string | null>(null);
   protected readonly saveError = signal<string | null>(null);
   protected readonly currentStock = signal<number | null>(null);
-  protected readonly addingCategory = signal(false);
-  protected readonly newCategoryName = this.fb.control('', [Validators.required, Validators.maxLength(100)]);
 
   protected readonly form = this.fb.group({
     sku: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(50), Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(150)]],
+    barcode: ['', [Validators.maxLength(50), Validators.pattern(/^\d*$/)]],
     description: ['', [Validators.maxLength(1000)]],
-    categoryId: this.fb.control<number | null>(null, [Validators.required]),
-    sellingPrice: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(9999999.99), money]),
+    category: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
+    price: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(9999999.99), money]),
     costPrice: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(9999999.99), money]),
     initialStock: this.fb.control<number | null>(0, [Validators.required, Validators.min(0), Validators.max(1_000_000), Validators.pattern(/^\d+$/)]),
-    reorderLevel: this.fb.control<number | null>(5, [Validators.required, Validators.min(0), Validators.max(1_000_000), Validators.pattern(/^\d+$/)]),
+    lowStockThreshold: this.fb.control<number | null>(20, [Validators.required, Validators.min(0), Validators.max(1_000_000), Validators.pattern(/^\d+$/)]),
+    expiryDate: [''],
     isActive: [true],
   });
 
@@ -68,10 +68,12 @@ export class ProductForm implements OnInit {
           sku: p.sku,
           name: p.name,
           description: p.description ?? '',
-          categoryId: p.categoryId,
-          sellingPrice: p.sellingPrice,
+          barcode: p.barcode ?? '',
+          category: p.category,
+          price: p.price,
           costPrice: p.costPrice,
-          reorderLevel: p.reorderLevel,
+          lowStockThreshold: p.lowStockThreshold,
+          expiryDate: p.expiryDate ?? '',
           isActive: p.isActive,
         });
         this.currentStock.set(p.stockQuantity);
@@ -89,23 +91,6 @@ export class ProductForm implements OnInit {
     return c.invalid && (c.touched || c.dirty);
   }
 
-  protected addCategory(): void {
-    if (this.newCategoryName.invalid) {
-      this.newCategoryName.markAsTouched();
-      return;
-    }
-    this.categoriesApi.create(this.newCategoryName.value.trim()).subscribe({
-      next: (category) => {
-        this.categories.update((list) => [...list, category].sort((a, b) => a.name.localeCompare(b.name)));
-        this.form.controls.categoryId.setValue(category.id);
-        this.newCategoryName.reset('');
-        this.addingCategory.set(false);
-        this.toast.success(`Category "${category.name}" created.`);
-      },
-      error: (err: unknown) => this.toast.error(errorMessage(err)),
-    });
-  }
-
   protected save(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -115,11 +100,13 @@ export class ProductForm implements OnInit {
     const input: ProductInput = {
       sku: v.sku.trim(),
       name: v.name.trim(),
+      barcode: v.barcode.trim() || null,
       description: v.description.trim() || null,
-      categoryId: v.categoryId!,
-      sellingPrice: v.sellingPrice!,
+      category: v.category.trim(),
+      price: v.price!,
       costPrice: v.costPrice!,
-      reorderLevel: v.reorderLevel!,
+      lowStockThreshold: v.lowStockThreshold!,
+      expiryDate: v.expiryDate || null,
       ...(this.isEdit() ? { isActive: v.isActive } : { initialStock: v.initialStock! }),
     };
 

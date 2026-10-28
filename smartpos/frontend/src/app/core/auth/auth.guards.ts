@@ -14,9 +14,3 @@ export const guestGuard: CanActivateFn = () => {
   const router = inject(Router);
   return auth.isAuthenticated() ? router.createUrlTree(['/dashboard']) : true;
 };
-
-export const adminGuard: CanActivateFn = () => {
-  const auth = inject(AuthService);
-  const router = inject(Router);
-  return auth.isAdmin() ? true : router.createUrlTree(['/dashboard']);
-};

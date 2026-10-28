@@ -2,7 +2,7 @@
   <div class="page-header">
     <div>
       <h1>Dashboard</h1>
-      <p>Today's activity{{ summary() ? ' · ' + (summary()!.date | date: 'fullDate') : '' }}</p>
+      <p>{{ summary() ? (summary()!.date | date: 'fullDate') : 'Sales overview' }}</p>
     </div>
     <div class="page-actions">
       <button type="button" class="btn btn-secondary" (click)="load()" [disabled]="loading()">
@@ -19,15 +19,135 @@
   @if (loading() && !summary()) {
     <app-loading label="Loading dashboard…" />
   } @else if (summary(); as s) {
-    <section class="stats-grid" aria-label="Key figures">
+    <section class="stats-grid" aria-label="Today">
       <app-stat-card label="Today's sales" [value]="s.todaySalesTotal | money" icon="banknote" />
       <app-stat-card label="Transactions today" [value]="s.todayTransactionCount" icon="receipt" />
       <app-stat-card label="Active products" [value]="s.productCount" icon="package" />
       <app-stat-card label="Low-stock products" [value]="s.lowStockCount" icon="warning"
-                     [tone]="s.lowStockCount > 0 ? 'warning' : 'default'" hint="At or below reorder level" />
+                     [tone]="s.lowStockCount > 0 ? 'warning' : 'default'" hint="At or below the low-stock level" />
     </section>
 
-    <div class="grid-2">
+    <div class="section-head">
+      <div>
+        <h2>Sales performance</h2>
+        <span class="sub">{{ insights() ? 'Last ' + period() + ' days, compared with the ' + period() + ' days before' : 'Loading…' }}</span>
+      </div>
+      <div class="segmented" role="group" aria-label="Period">
+        @for (p of periods; track p) {
+          <button type="button" [attr.aria-pressed]="period() === p" (click)="setPeriod(p)">{{ p }} days</button>
+        }
+      </div>
+    </div>
+
+    @if (insights(); as i) {
+      @if (!hasSales()) {
+        <section class="card empty-insights">
+          <app-empty-state icon="chart" title="No sales in this period"
+                           message="Charts and comparisons appear here once bills have been completed. Try a longer period, or make a sale.">
+            <a routerLink="/pos" class="btn btn-primary btn-sm">Start a sale</a>
+          </app-empty-state>
+        </section>
+      } @else {
+        <div [class.dim-while-loading]="insightsLoading()">
+          <section class="kpi-grid" aria-label="Key figures for the period">
+            <app-kpi-card style="--i:0" label="Revenue" icon="banknote" [current]="i.kpis.revenue.current" [previous]="i.kpis.revenue.previous"
+                          [format]="moneyWhole" [trend]="revenueTrend()" [comparison]="'vs previous ' + i.days + ' days'" />
+            <app-kpi-card style="--i:1" label="Bills" icon="receipt" [current]="i.kpis.bills.current" [previous]="i.kpis.bills.previous"
+                          [format]="count" [trend]="billsTrend()" [comparison]="'vs previous ' + i.days + ' days'" />
+            <app-kpi-card style="--i:2" label="Average bill" icon="trend" [current]="i.kpis.averageBill.current" [previous]="i.kpis.averageBill.previous"
+                          [format]="money" [trend]="averageTrend()" [comparison]="'vs previous ' + i.days + ' days'" />
+            <app-kpi-card style="--i:3" label="Items sold" icon="package" [current]="i.kpis.itemsSold.current" [previous]="i.kpis.itemsSold.previous"
+                          [format]="count" [hint]="(i.kpis.itemsSold.current / i.kpis.bills.current).toFixed(1) + ' items per bill'" [comparison]="'vs previous ' + i.days + ' days'" />
+            <app-kpi-card style="--i:4" label="Gross profit" icon="chart" [current]="i.kpis.grossProfit.current" [previous]="i.kpis.grossProfit.previous"
+                          [format]="moneyWhole" [hint]="margin().toFixed(1) + '% margin on net sales'" [comparison]="'vs previous ' + i.days + ' days'" />
+            <app-kpi-card style="--i:5" label="Customers served" icon="user" [current]="i.kpis.customers.current" [previous]="i.kpis.customers.previous"
+                          [format]="count" [hint]="'Distinct customers on a bill'" [comparison]="'vs previous ' + i.days + ' days'" />
+          </section>
+
+          <section class="highlights" aria-label="Highlights" style="margin-top: 16px">
+            @for (h of highlights(); track h.title; let n = $index) {
+              <div class="card highlight" [style.--i]="n">
+                <span class="ico"><app-icon [name]="h.icon" [size]="16" /></span>
+                <div><div class="t">{{ h.title }}</div><div class="x">{{ h.text }}</div><div class="s">{{ h.sub }}</div></div>
+              </div>
+            }
+          </section>
+
+          <div class="chart-grid trend" style="margin-top: 16px">
+            <section class="card chart-card" style="--i:0" aria-labelledby="trend-heading">
+              <div class="card-header"><h2 id="trend-heading">Revenue over time</h2></div>
+              <div class="card-body">
+                <p class="caption">Daily bill totals (tax included) against the same days of the previous period.</p>
+                <app-area-chart [points]="dailyPoints()" [valueFormat]="money" [seriesName]="'Last ' + i.days + ' days'"
+                                [previousName]="'Previous ' + i.days + ' days'" [ariaLabel]="'Daily revenue for the last ' + i.days + ' days'" />
+              </div>
+            </section>
+            <section class="card chart-card" style="--i:1" aria-labelledby="pay-heading">
+              <div class="card-header"><h2 id="pay-heading">Payment mix</h2></div>
+              <div class="card-body">
+                <p class="caption">Share of revenue by how customers paid.</p>
+                <app-donut-chart [slices]="paymentSlices()" totalLabel="revenue" [totalFormat]="moneyCompact" ariaLabel="Revenue by payment method" />
+                <div class="mix">
+                  <strong>{{ customerShare().toFixed(0) }}%</strong> of bills have a customer attached
+                  <div class="meter" role="img" [attr.aria-label]="customerShare().toFixed(0) + ' percent of bills have a customer'"><i [style.width.%]="customerShare()"></i></div>
+                  {{ i.billsWithCustomer }} with a customer · {{ i.billsWalkIn }} walk-in
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="chart-grid even" style="margin-top: 16px">
+            <section class="card chart-card" style="--i:2" aria-labelledby="cat-heading">
+              <div class="card-header"><h2 id="cat-heading">Sales by category</h2></div>
+              <div class="card-body">
+                <p class="caption">Net sales: after discount, before tax.</p>
+                <app-hbar-chart [rows]="categoryRows()" [valueFormat]="moneyWhole" ariaLabel="Net sales by category" />
+              </div>
+            </section>
+            <section class="card chart-card" style="--i:3" aria-labelledby="hours-heading">
+              <div class="card-header"><h2 id="hours-heading">Busiest hours</h2></div>
+              <div class="card-body">
+                <p class="caption">Bills by hour of the day across the period.</p>
+                <app-bar-chart [bars]="hourlyBars()" valueName="Bills" [valueFormat]="count" ariaLabel="Bills by hour of the day" />
+              </div>
+            </section>
+          </div>
+
+          <section class="card chart-card" style="--i:4; margin-top: 16px" aria-labelledby="heat-heading">
+            <div class="card-header"><h2 id="heat-heading">When customers shop</h2></div>
+            <div class="card-body">
+              <p class="caption">Bills by weekday and hour. Darker means busier: use it to plan staffing and restocking.</p>
+              <app-heatmap [data]="i.heatmap" />
+            </div>
+          </section>
+
+          <div class="chart-grid even" style="margin-top: 16px">
+            <section class="card chart-card" style="--i:5" aria-labelledby="prod-heading">
+              <div class="card-header"><h2 id="prod-heading">Top products</h2></div>
+              <div class="card-body">
+                <p class="caption">By net sales, with units sold and gross profit.</p>
+                <app-hbar-chart [rows]="productRows()" [valueFormat]="moneyWhole" ariaLabel="Top products by net sales" />
+              </div>
+            </section>
+            <section class="card chart-card" style="--i:6" aria-labelledby="cust-heading">
+              <div class="card-header"><h2 id="cust-heading">Top customers</h2></div>
+              <div class="card-body">
+                <p class="caption">Who spent the most in this period.</p>
+                @if (customerRows().length === 0) {
+                  <app-empty-state icon="user" title="No customer bills yet" message="Attach a customer to a sale at the POS to see them here." />
+                } @else {
+                  <app-hbar-chart [rows]="customerRows()" [valueFormat]="moneyWhole" ariaLabel="Top customers by spend" />
+                }
+              </div>
+            </section>
+          </div>
+        </div>
+      }
+    } @else if (insightsLoading()) {
+      <app-loading label="Crunching the numbers…" />
+    }
+
+    <div class="grid-2" style="margin-top: 0">
       <section class="card" aria-labelledby="recent-heading">
         <div class="card-header">
           <h2 id="recent-heading">Recent transactions</h2>
@@ -42,15 +162,15 @@
           <div class="table-wrap">
             <table class="table">
               <thead>
-                <tr><th scope="col">Invoice</th><th scope="col" class="hide-sm">Cashier</th><th scope="col">Time</th><th scope="col" class="num">Total</th></tr>
+                <tr><th scope="col">Bill</th><th scope="col" class="hide-sm">Cashier</th><th scope="col">Time</th><th scope="col" class="num">Total</th></tr>
               </thead>
               <tbody>
                 @for (sale of s.recentTransactions; track sale.id) {
                   <tr>
-                    <td><a [routerLink]="['/sales', sale.id]" class="mono">{{ sale.invoiceNumber }}</a></td>
+                    <td><a [routerLink]="['/sales', sale.id]" class="mono">{{ sale.billNumber }}</a></td>
                     <td class="hide-sm">{{ sale.cashierName }}</td>
                     <td class="nowrap">{{ sale.createdAt | date: 'MMM d, h:mm a' }}</td>
-                    <td class="num">{{ sale.total | money }}</td>
+                    <td class="num">{{ sale.totalAmount | money }}</td>
                   </tr>
                 }
               </tbody>
@@ -66,19 +186,19 @@
         </div>
         @if (s.lowStockProducts.length === 0) {
           <app-empty-state icon="check" title="Stock levels look good"
-                           message="No active product is at or below its reorder level." />
+                           message="No active product is at or below its low-stock level." />
         } @else {
           <div class="table-wrap">
             <table class="table">
               <thead>
-                <tr><th scope="col">Product</th><th scope="col" class="num">On hand</th><th scope="col" class="num hide-sm">Reorder at</th><th scope="col">Status</th></tr>
+                <tr><th scope="col">Product</th><th scope="col" class="num">On hand</th><th scope="col" class="num hide-sm">Low at</th><th scope="col">Status</th></tr>
               </thead>
               <tbody>
                 @for (item of s.lowStockProducts; track item.productId) {
                   <tr>
                     <td><div class="cell-title">{{ item.name }}</div><div class="cell-sub mono">{{ item.sku }}</div></td>
                     <td class="num">{{ item.stockQuantity }}</td>
-                    <td class="num hide-sm">{{ item.reorderLevel }}</td>
+                    <td class="num hide-sm">{{ item.lowStockThreshold }}</td>
                     <td><app-stock-badge [status]="item.status" /></td>
                   </tr>
                 }

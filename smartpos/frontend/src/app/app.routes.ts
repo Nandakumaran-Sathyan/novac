@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { settingsResolver } from './core/api/settings.service';
-import { adminGuard, authGuard, guestGuard } from './core/auth/auth.guards';
+import { authGuard, guestGuard } from './core/auth/auth.guards';
 import { Shell } from './layout/shell';
 
 // Feature pages are lazy-loaded so the login screen downloads only what it needs.
@@ -10,6 +10,12 @@ export const routes: Routes = [
     title: 'Sign in',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
+  },
+  {
+    path: 'register',
+    title: 'Create account',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/auth/register').then((m) => m.Register),
   },
   {
     path: '',
@@ -36,14 +42,17 @@ export const routes: Routes = [
       {
         path: 'products/new',
         title: 'New product',
-        canActivate: [adminGuard],
         loadComponent: () => import('./features/products/product-form').then((m) => m.ProductForm),
       },
       {
         path: 'products/:id/edit',
         title: 'Edit product',
-        canActivate: [adminGuard],
         loadComponent: () => import('./features/products/product-form').then((m) => m.ProductForm),
+      },
+      {
+        path: 'customers',
+        title: 'Customers',
+        loadComponent: () => import('./features/customers/customer-list').then((m) => m.CustomerList),
       },
       {
         path: 'inventory',
@@ -68,14 +77,7 @@ export const routes: Routes = [
       {
         path: 'reports',
         title: 'Reports',
-        canActivate: [adminGuard],
         loadComponent: () => import('./features/reports/reports').then((m) => m.Reports),
-      },
-      {
-        path: 'users',
-        title: 'Users',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/users/user-list').then((m) => m.UserList),
       },
     ],
   },

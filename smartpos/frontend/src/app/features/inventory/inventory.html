@@ -47,7 +47,7 @@
                 <th scope="col">Product</th>
                 <th scope="col" class="hide-sm">Category</th>
                 <th scope="col" class="num">On hand</th>
-                <th scope="col" class="num hide-sm">Reorder at</th>
+                <th scope="col" class="num hide-sm">Low at</th>
                 <th scope="col">Status</th>
                 <th scope="col" class="hide-sm">Updated</th>
                 <th scope="col" class="actions"><span class="sr-only">Actions</span></th>
@@ -57,17 +57,15 @@
               @for (item of r.items; track item.productId) {
                 <tr>
                   <td><div class="cell-title">{{ item.name }}</div><div class="cell-sub mono">{{ item.sku }}</div></td>
-                  <td class="hide-sm">{{ item.categoryName }}</td>
+                  <td class="hide-sm">{{ item.category }}</td>
                   <td class="num">{{ item.stockQuantity }}</td>
-                  <td class="num hide-sm">{{ item.reorderLevel }}</td>
+                  <td class="num hide-sm">{{ item.lowStockThreshold }}</td>
                   <td><app-stock-badge [status]="item.status" /></td>
-                  <td class="hide-sm nowrap muted">{{ item.updatedAt | date: 'MMM d, h:mm a' }}</td>
+                  <td class="hide-sm nowrap muted">{{ item.lastUpdated | date: 'MMM d, h:mm a' }}</td>
                   <td class="actions">
                     <a [routerLink]="['/inventory/movements']" [queryParams]="{ productId: item.productId }" class="btn btn-ghost btn-sm"
                        [attr.aria-label]="'Stock history for ' + item.name">History</a>
-                    @if (auth.isAdmin()) {
-                      <button type="button" class="btn btn-secondary btn-sm" (click)="openAdjust(item)">Adjust</button>
-                    }
+                    <button type="button" class="btn btn-secondary btn-sm" (click)="openAdjust(item)">Adjust</button>
                   </td>
                 </tr>
               }

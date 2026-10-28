@@ -9,13 +9,18 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
     public void Configure(EntityTypeBuilder<StockMovement> builder)
     {
         builder.ToTable("StockMovements", t =>
-            t.HasCheckConstraint("CK_StockMovements_QuantityAfter_NonNegative", "QuantityAfter >= 0"));
+            t.HasCheckConstraint("CK_StockMovements_QuantityAfter_NonNegative", "\"QuantityAfter\" >= 0"));
 
         builder.Property(m => m.Type).HasConversion<string>().HasMaxLength(20);
         builder.Property(m => m.Reason).HasMaxLength(250).IsRequired();
 
         builder.HasIndex(m => new { m.ProductId, m.CreatedAt });
-        builder.HasIndex(m => m.CreatedAt);
+        builder.HasIndex(m => new { m.ShopId, m.CreatedAt });
+
+        builder.HasOne(m => m.Shop)
+            .WithMany()
+            .HasForeignKey(m => m.ShopId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Cascade only matters for products with no sales (others cannot be deleted).
         builder.HasOne(m => m.Product)

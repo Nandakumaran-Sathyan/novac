@@ -1,40 +1,43 @@
 # API reference
 
 Base URL (development): `http://localhost:5080`. Interactive docs: **`/swagger`** (Development
-environment only). All endpoints except `POST /api/auth/login` and `GET /health` require
+environment only). All endpoints except `POST /api/auth/login`, `POST /api/auth/register` and `GET /health` require
 `Authorization: Bearer <accessToken>`.
 
-Enums are sent and returned as strings (`"Admin"`, `"Cash"`, `"Low"`…). Timestamps are UTC ISO-8601.
+Enums are sent and returned as strings (`"UPI"`, `"Completed"`, `"Low"`…). Timestamps are UTC ISO-8601. `expiryDate` is a plain calendar date (`yyyy-MM-dd`).
+
+There are no roles: every signed-in user has the same access, to their own shop's data. Everything is scoped to the signed-in user's shop: a record that belongs to another shop returns 404, exactly as if it did not exist.
 Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the store time zone.
 
 ## Endpoints
 
-| Method | Path | Role | Description |
-|---|---|---|---|
-| POST | `/api/auth/login` | public | `{ email, password }` → `{ accessToken, expiresAt, user }`. Rate limited. |
-| GET | `/api/auth/me` | any | Current user profile |
-| GET | `/api/dashboard/summary` | any | Today's totals, counts, recent sales, low-stock list |
-| GET | `/api/settings/pos` | any | Store name, currency, tax rate, caller's max discount |
-| GET | `/api/products` | any | `search`, `categoryId`, `includeInactive`, `page`, `pageSize` |
-| GET | `/api/products/{id}` | any | One product |
-| POST | `/api/products` | Admin | Create (`initialStock` recorded as a movement) → 201 |
-| PUT | `/api/products/{id}` | Admin | Update details/prices/active flag (not stock) |
-| DELETE | `/api/products/{id}` | Admin | 204; 409 if the product has sales |
-| GET | `/api/categories` | any | All categories with product counts |
-| POST | `/api/categories` | Admin | Create → 201; 409 on duplicate name |
-| GET | `/api/inventory` | any | `search`, `filter` (`All`/`Low`/`OutOfStock`), `categoryId`, paging |
-| POST | `/api/inventory/adjustments` | Admin | `{ productId, quantityChange, reason }` → 201; 409 if stock would go negative |
-| GET | `/api/inventory/movements` | any | `productId`, `type`, `from`, `to`, paging |
-| POST | `/api/sales` | any | `{ items: [{ productId, quantity }], discountPercent, paymentMethod }` → 201 |
-| GET | `/api/sales` | any | `from`, `to`, `search` (invoice no.), `cashierId` (admin), paging. Cashiers see own sales |
-| GET | `/api/sales/{id}` | any | Sale with items (cashiers: own only, else 404) |
-| GET | `/api/reports/daily-sales` | Admin | `from`, `to` (default last 7 days, max 366) |
-| GET | `/api/reports/top-products` | Admin | `from`, `to`, `limit` (1–50, default 10) |
-| GET | `/api/users` | Admin | `search`, `role`, paging |
-| GET | `/api/users/{id}` | Admin | One user |
-| POST | `/api/users` | Admin | `{ fullName, email, password, role }` → 201 |
-| PUT | `/api/users/{id}` | Admin | `{ fullName, role, isActive, newPassword? }`; can't demote/deactivate yourself |
-| GET | `/health` | public | `{ status, checks: [{ name, status }] }`; 503 when the DB is unreachable |
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/auth/login` | Public. `{ email, password }` → `{ accessToken, expiresAt, user }`. Rate limited. |
+| POST | `/api/auth/register` | Public. `{ fullName, email, password, shopName, shopAddress? }` → 201 with the same body as login. Creates the user and the shop they own; 409 if the email is taken. Rate limited. |
+| GET | `/api/auth/me` | Current user profile |
+| GET | `/api/dashboard/summary` | Today's totals, counts, recent sales, low-stock list |
+| GET | `/api/dashboard/insights` | `days` (1–180, default 30). Sales analytics for the last N store days: KPIs with the previous N days for comparison (revenue, bills, average bill, items sold, customers, gross profit), a daily series with the matching previous-period day, a weekday × hour bill-count heatmap, payment mix, net sales by category, top products and customers, and customer vs walk-in bills. Completed bills only; days, weekdays and hours are in the store time zone. 400 outside 1–180 |
+| GET | `/api/settings/pos` | Shop name and address, currency, tax rate, caller's max discount |
+| GET | `/api/products` | `search` (name, SKU or barcode), `category` (exact name), `includeInactive`, `page`, `pageSize` |
+| GET | `/api/products/{id}` | One product |
+| POST | `/api/products` | `{ sku, barcode?, name, description?, category, price, costPrice, lowStockThreshold, expiryDate?, initialStock }` → 201 (creates its inventory row; `initialStock` recorded as a movement) |
+| PUT | `/api/products/{id}` | Full replace of details/prices/threshold/active flag (not stock); omitted optional fields are cleared |
+| DELETE | `/api/products/{id}` | 204; 409 if the product has sales |
+| GET | `/api/categories` | Distinct category names in use, with product counts (a category exists once a product uses it) |
+| GET | `/api/customers` | `search` (name or phone), paging |
+| GET | `/api/customers/{id}` | One customer |
+| POST | `/api/customers` | `{ name, phone }` → 201; 409 if the phone is taken in this shop |
+| PUT | `/api/customers/{id}` | `{ name, phone }` |
+| GET | `/api/inventory` | `search`, `filter` (`All`/`Low`/`OutOfStock`), `category`, paging |
+| POST | `/api/inventory/adjustments` | `{ productId, quantityChange, reason }` → 201; 409 if stock would go negative |
+| GET | `/api/inventory/movements` | `productId`, `type`, `from`, `to`, paging |
+| POST | `/api/sales` | `{ items: [{ productId, quantity }], discountPercent, paymentMethod, amountPaid?, customerId? }` → 201 |
+| GET | `/api/sales` | `from`, `to`, `search` (bill no.), paging |
+| GET | `/api/sales/{id}` | Sale with items (404 if it belongs to another shop) |
+| GET | `/api/reports/daily-sales` | `from`, `to` (default last 7 days, max 366) |
+| GET | `/api/reports/top-products` | `from`, `to`, `limit` (1–50, default 10) |
+| GET | `/health` | Public. `{ status, checks: [{ name, status }] }`; 503 when the DB is unreachable |
 
 ## Pagination
 
@@ -53,20 +56,36 @@ Errors use RFC 7807 problem details (`application/problem+json`) with a `traceId
 | 400 | Validation failed | `errors: { "Field": ["message"] }` |
 | 400 | Business rule (e.g. zero adjustment, bad date range) | `detail` |
 | 401 | Missing/expired token, or wrong credentials on login | `detail` on login |
-| 403 | Role not allowed, or discount above the role's limit | `detail` for discount |
-| 404 | Record not found (or not visible to a cashier) | `detail` |
-| 409 | Duplicate SKU/email/category, insufficient stock, deleting a sold product | `detail` |
+| 403 | Discount above the configured limit (`Pos:MaxDiscountPercent`) | `detail` |
+| 404 | Record not found (or belongs to another shop) | `detail` |
+| 409 | Duplicate SKU/barcode/email/customer phone, insufficient stock, deleting a sold product | `detail` |
 | 429 | Too many login attempts | — |
 | 500 | Unexpected error (details only in server log) | generic `detail` + `traceId` |
 
 ## Sale arithmetic
 
 ```
-line total = round(unit price × quantity)
-subtotal   = Σ line totals
-discount   = round(subtotal × discount% / 100)
-tax        = round((subtotal − discount) × tax% / 100)
-total      = subtotal − discount + tax
+line subtotal = round(unit price × quantity)
+subtotal      = Σ line subtotals
+discount      = round(subtotal × discount% / 100)
+tax           = round((subtotal − discount) × tax% / 100)
+total         = subtotal − discount + tax
 ```
 
 Rounding: 2 decimals, half away from zero. The tax rate in effect is stored on each sale.
+
+The discount and tax are then shared out across the lines in proportion to their value, to the
+cent (largest-remainder), so each `SaleItem` has its own `discountAmount`, `taxAmount` and
+`lineTotal` (= subtotal − discount + tax) and the lines always add up exactly to the bill.
+
+## Payment
+
+`amountPaid` is optional; leaving it out means "exactly the total".
+
+| Method | Rule |
+|---|---|
+| `Cash` | May be more than the total; the difference is returned as `changeAmount`. Less than the total → 400. |
+| `Card`, `UPI`, `Other` | Must equal the total (no change can be given) → 400 otherwise. |
+
+New sales are created with `status: "Completed"`. `Pending` and `Cancelled` exist in the schema but
+no endpoint creates or cancels a bill yet; reports and the dashboard count only `Completed` bills.

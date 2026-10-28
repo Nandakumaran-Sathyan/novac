@@ -12,7 +12,7 @@ public static class SmartPosClaims
     public const string UserId = JwtRegisteredClaimNames.Sub;
     public const string Name = JwtRegisteredClaimNames.Name;
     public const string Email = JwtRegisteredClaimNames.Email;
-    public const string Role = "role";
+    public const string ShopId = "shop";
 }
 
 public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider) : ITokenService
@@ -39,7 +39,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider t
                 [SmartPosClaims.UserId] = user.Id.ToString(),
                 [SmartPosClaims.Name] = user.FullName,
                 [SmartPosClaims.Email] = user.Email,
-                [SmartPosClaims.Role] = user.Role.ToString(),
+                [SmartPosClaims.ShopId] = user.ShopId.ToString(),
                 [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString("N")
             },
             SigningCredentials = new SigningCredentials(CreateKey(jwt.SigningKey), SecurityAlgorithms.HmacSha256)

@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartPOS.API.Auth;
 using SmartPOS.Application.Common;
 using SmartPOS.Application.Products;
 
@@ -11,7 +9,7 @@ namespace SmartPOS.API.Controllers;
 [Produces("application/json")]
 public sealed class ProductsController(IProductService productService) : ControllerBase
 {
-    /// <summary>Search and page through products. Search matches name or SKU.</summary>
+    /// <summary>Search and page through products. Search matches name, SKU or barcode.</summary>
     [HttpGet]
     [ProducesResponseType<PagedResult<ProductDto>>(StatusCodes.Status200OK)]
     public Task<PagedResult<ProductDto>> List([FromQuery] ProductQuery query, CancellationToken cancellationToken) =>
@@ -25,7 +23,6 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Create a product. Initial stock is recorded as a stock movement.</summary>
     [HttpPost]
-    [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType<ProductDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -37,7 +34,6 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Update product details. Stock is changed only through inventory adjustments.</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -47,7 +43,6 @@ public sealed class ProductsController(IProductService productService) : Control
 
     /// <summary>Delete a product that has never been sold. Products with sales return 409; deactivate them instead.</summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]

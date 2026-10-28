@@ -1,13 +1,17 @@
 using System.Security.Claims;
 using SmartPOS.Application.Common;
-using SmartPOS.Core.Enums;
 
 namespace SmartPOS.API.Auth;
 
-public static class Roles
+/// <summary>
+/// The shop claim of the current request, or null outside a signed-in request. Read by the DbContext's
+/// tenant query filters. Note it is null while the JWT is still being validated, which is why token
+/// validation looks users up with the filters switched off.
+/// </summary>
+public sealed class CurrentShop(IHttpContextAccessor httpContextAccessor) : ICurrentShop
 {
-    public const string Admin = nameof(UserRole.Admin);
-    public const string Cashier = nameof(UserRole.Cashier);
+    public int? ShopId =>
+        int.TryParse(httpContextAccessor.HttpContext?.User.FindFirstValue(SmartPosClaims.ShopId), out var id) ? id : null;
 }
 
 public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
@@ -19,7 +23,8 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
         ? id
         : throw new InvalidOperationException("The request is not authenticated.");
 
-    public UserRole Role => Enum.TryParse<UserRole>(Principal.FindFirstValue(SmartPosClaims.Role), out var role)
-        ? role
+    public int ShopId => int.TryParse(Principal.FindFirstValue(SmartPosClaims.ShopId), out var id)
+        ? id
         : throw new InvalidOperationException("The request is not authenticated.");
+
 }

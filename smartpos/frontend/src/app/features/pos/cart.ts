@@ -54,7 +54,7 @@ export function addProduct(lines: readonly CartLine[], product: Product): CartLi
       productId: product.id,
       sku: product.sku,
       name: product.name,
-      unitPrice: product.sellingPrice,
+      unitPrice: product.price,
       quantity: 1,
       available: product.stockQuantity,
     },

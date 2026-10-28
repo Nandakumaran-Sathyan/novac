@@ -19,12 +19,13 @@ public sealed class SaleService(
     ILogger<SaleService> logger) : ISaleService
 {
     internal static readonly Expression<Func<Sale, SaleSummaryDto>> ToSummaryDto = s => new SaleSummaryDto(
-        s.Id, s.InvoiceNumber, s.CreatedAt, s.Cashier.FullName, s.Items.Sum(i => i.Quantity), s.PaymentMethod, s.Total);
+        s.Id, s.BillNumber, s.CreatedAt, s.User.FullName, s.Customer != null ? s.Customer.Name : null,
+        s.Items.Sum(i => i.Quantity), s.Status, s.PaymentMethod, s.TotalAmount);
 
     public async Task<SaleDto> CreateAsync(CreateSaleRequest request, CancellationToken cancellationToken)
     {
         var options = posOptions.Value;
-        DiscountPolicy.EnsureAllowed(currentUser.Role, request.DiscountPercent, options);
+        DiscountPolicy.EnsureAllowed(request.DiscountPercent, options);
 
         // Merge duplicate lines and sort by product ID. A consistent lock order means two
         // concurrent sales touching the same products cannot deadlock each other.
@@ -36,36 +37,47 @@ public sealed class SaleService(
         if (lines.Count == 0)
             throw new BusinessRuleException("A sale must contain at least one item.");
 
+        if (request.CustomerId is { } customerId &&
+            !await db.Customers.AnyAsync(c => c.Id == customerId, cancellationToken))
+            throw new BusinessRuleException($"Customer {customerId} does not exist.");
+
         var productIds = lines.Select(l => l.ProductId).ToList();
         var products = await db.Products.AsNoTracking()
             .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name, p.Sku, p.Price, p.CostPrice, p.IsActive, Stock = p.Inventory != null ? p.Inventory.StockQuantity : 0 })
             .ToDictionaryAsync(p => p.Id, cancellationToken);
 
         foreach (var (productId, quantity) in lines)
         {
             if (!products.TryGetValue(productId, out var product) || !product.IsActive)
                 throw new BusinessRuleException($"Product {productId} does not exist or is not available for sale.");
-            StockRules.EnsureAvailable(product.Name, product.StockQuantity, quantity);
+            StockRules.EnsureAvailable(product.Name, product.Stock, quantity);
         }
 
         // Prices come from the database, never from the client.
         var totals = SaleCalculator.Calculate(
-            lines.Select(l => new SaleLineInput(products[l.ProductId].SellingPrice, l.Quantity)).ToList(),
+            lines.Select(l => new SaleLineInput(products[l.ProductId].Price, l.Quantity)).ToList(),
             request.DiscountPercent,
             options.TaxRatePercent);
+        var (amountPaid, changeAmount) = SaleCalculator.Settle(totals.Total, request.PaymentMethod, request.AmountPaid);
 
         var now = calendar.UtcNow;
         var sale = new Sale
         {
-            InvoiceNumber = $"INV-{now:yyyyMMdd}-{RandomNumberGenerator.GetHexString(8)}",
-            CashierId = currentUser.UserId,
+            BillNumber = $"BILL-{now:yyyyMMdd}-{RandomNumberGenerator.GetHexString(8)}",
+            ShopId = currentUser.ShopId,
+            UserId = currentUser.UserId,
+            CustomerId = request.CustomerId,
             Subtotal = totals.Subtotal,
             DiscountPercent = request.DiscountPercent,
             DiscountAmount = totals.DiscountAmount,
             TaxRatePercent = options.TaxRatePercent,
             TaxAmount = totals.TaxAmount,
-            Total = totals.Total,
+            TotalAmount = totals.Total,
             PaymentMethod = request.PaymentMethod,
+            AmountPaid = amountPaid,
+            ChangeAmount = changeAmount,
+            Status = SaleStatus.Completed,
             CreatedAt = now
         };
 
@@ -86,19 +98,22 @@ public sealed class SaleService(
                 ProductId = productId,
                 ProductName = product.Name,
                 Sku = product.Sku,
-                UnitPrice = product.SellingPrice,
-                UnitCost = product.CostPrice,
                 Quantity = quantity,
+                UnitPrice = product.Price,
+                UnitCost = product.CostPrice,
+                DiscountAmount = totals.LineDiscounts[i],
+                TaxAmount = totals.LineTaxes[i],
                 LineTotal = totals.LineTotals[i]
             });
             db.StockMovements.Add(new StockMovement
             {
+                ShopId = currentUser.ShopId,
                 ProductId = productId,
                 Sale = sale,
                 QuantityChange = -quantity,
                 QuantityAfter = quantityAfter,
                 Type = StockMovementType.Sale,
-                Reason = $"Sale {sale.InvoiceNumber}",
+                Reason = $"Sale {sale.BillNumber}",
                 UserId = currentUser.UserId,
                 CreatedAt = now
             });
@@ -108,16 +123,14 @@ public sealed class SaleService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        logger.LogInformation("Sale {InvoiceNumber} created by user {UserId}: {ItemCount} lines, total {Total}",
-            sale.InvoiceNumber, currentUser.UserId, sale.Items.Count, sale.Total);
+        logger.LogInformation("Sale {BillNumber} created by user {UserId}: {ItemCount} lines, total {Total}",
+            sale.BillNumber, currentUser.UserId, sale.Items.Count, sale.TotalAmount);
         return await GetAsync(sale.Id, cancellationToken);
     }
 
     public async Task<PagedResult<SaleSummaryDto>> ListAsync(SaleQuery query, CancellationToken cancellationToken)
     {
         var sales = VisibleSales();
-        if (currentUser.IsAdmin && query.CashierId is { } cashierId)
-            sales = sales.Where(s => s.CashierId == cashierId);
         if (query.From is { } from)
         {
             var fromUtc = calendar.StartOfDayUtc(from);
@@ -131,7 +144,7 @@ public sealed class SaleService(
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = SearchPattern.Contains(query.Search);
-            sales = sales.Where(s => EF.Functions.Like(s.InvoiceNumber, pattern, SearchPattern.EscapeCharacter));
+            sales = sales.Where(s => EF.Functions.Like(s.BillNumber.ToLower(), pattern, SearchPattern.EscapeCharacter));
         }
 
         return await sales
@@ -142,31 +155,37 @@ public sealed class SaleService(
 
     public async Task<SaleDto> GetAsync(int id, CancellationToken cancellationToken)
     {
-        // A cashier asking for someone else's sale gets 404, not 403, so IDs can't be probed.
+        // A sale from another shop is not visible at all, so it gets 404, not 403: IDs can't be probed.
         var sale = await VisibleSales()
                        .Where(s => s.Id == id)
                        .Select(s => new SaleDto(
-                           s.Id, s.InvoiceNumber, s.CreatedAt, s.CashierId, s.Cashier.FullName, s.PaymentMethod,
-                           s.Subtotal, s.DiscountPercent, s.DiscountAmount, s.TaxRatePercent, s.TaxAmount, s.Total,
+                           s.Id, s.BillNumber, s.CreatedAt, s.UserId, s.User.FullName,
+                           s.CustomerId, s.Customer != null ? s.Customer.Name : null,
+                           s.Status, s.PaymentMethod,
+                           s.Subtotal, s.DiscountPercent, s.DiscountAmount, s.TaxRatePercent, s.TaxAmount,
+                           s.TotalAmount, s.AmountPaid, s.ChangeAmount,
                            s.Items.OrderBy(i => i.Id)
-                               .Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.UnitPrice, i.Quantity, i.LineTotal))
+                               .Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity,
+                                   i.UnitPrice, i.DiscountAmount, i.TaxAmount, i.LineTotal))
                                .ToList()))
                        .SingleOrDefaultAsync(cancellationToken)
                    ?? throw NotFoundException.For("Sale", id);
         return sale;
     }
 
-    public PosSettingsDto GetPosSettings()
+    public async Task<PosSettingsDto> GetPosSettingsAsync(CancellationToken cancellationToken)
     {
         var store = storeOptions.Value;
         var pos = posOptions.Value;
-        return new PosSettingsDto(store.Name, store.CurrencyCode, store.TimeZoneId, pos.TaxRatePercent,
-            DiscountPolicy.MaxDiscountPercent(currentUser.Role, pos));
+        var shop = await db.Shops.AsNoTracking()
+            .Where(s => s.Id == currentUser.ShopId)
+            .Select(s => new { s.ShopName, s.Address })
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw NotFoundException.For("Shop", currentUser.ShopId);
+        return new PosSettingsDto(shop.ShopName, shop.Address, store.CurrencyCode, store.TimeZoneId, pos.TaxRatePercent,
+            DiscountPolicy.MaxDiscountPercent(pos));
     }
 
-    private IQueryable<Sale> VisibleSales()
-    {
-        var sales = db.Sales.AsNoTracking();
-        return currentUser.IsAdmin ? sales : sales.Where(s => s.CashierId == currentUser.UserId);
-    }
+    /// <summary>The shop's own sales (the DbContext's shop filter does the scoping).</summary>
+    private IQueryable<Sale> VisibleSales() => db.Sales.AsNoTracking();
 }

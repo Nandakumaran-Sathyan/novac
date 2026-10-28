@@ -16,7 +16,7 @@ import { Icon } from '../shared/components/icon';
       <span class="avatar" aria-hidden="true">{{ initials() }}</span>
       <span class="user-text">
         <span class="user-name">{{ auth.user()?.fullName }}</span>
-        <span class="user-role">{{ auth.user()?.role }}</span>
+        <span class="user-role">{{ auth.user()?.email }}</span>
       </span>
       <button type="button" class="btn btn-ghost btn-sm" (click)="auth.logout()">
         <app-icon name="logout" [size]="16" /> <span class="hide-sm">Sign out</span>

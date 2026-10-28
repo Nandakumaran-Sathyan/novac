@@ -16,4 +16,5 @@
 @media print {
   .invoice { padding: 0; }
   .invoice-table tbody tr:hover { background: none; }
+  .invoice-table .hide-sm { display: table-cell; }
 }

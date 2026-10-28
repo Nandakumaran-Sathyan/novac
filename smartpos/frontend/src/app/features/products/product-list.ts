@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -17,7 +18,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 @Component({
   selector: 'app-product-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, Icon, Pagination, EmptyState, ErrorAlert, Loading, MoneyPipe],
+  imports: [ReactiveFormsModule, DatePipe, RouterLink, Icon, Pagination, EmptyState, ErrorAlert, Loading, MoneyPipe],
   templateUrl: './product-list.html',
 })
 export class ProductList implements OnInit {
@@ -29,7 +30,7 @@ export class ProductList implements OnInit {
   protected readonly auth = inject(AuthService);
 
   protected readonly search = new FormControl('', { nonNullable: true });
-  protected readonly categoryId = new FormControl<number | null>(null);
+  protected readonly category = new FormControl<string | null>(null);
   protected readonly categories = signal<Category[]>([]);
   protected readonly result = signal<PagedResult<Product> | null>(null);
   protected readonly loading = signal(true);
@@ -42,12 +43,12 @@ export class ProductList implements OnInit {
     this.search.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reload());
-    this.categoryId.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reload());
+    this.category.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reload());
     this.load();
   }
 
   protected get hasFilters(): boolean {
-    return this.search.value.trim() !== '' || this.categoryId.value !== null;
+    return this.search.value.trim() !== '' || this.category.value !== null;
   }
 
   protected reload(): void {
@@ -64,7 +65,7 @@ export class ProductList implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     this.products
-      .list({ search: this.search.value.trim(), categoryId: this.categoryId.value, page: this.page, pageSize: this.pageSize })
+      .list({ search: this.search.value.trim(), category: this.category.value, page: this.page, pageSize: this.pageSize })
       .subscribe({
         next: (r) => {
           this.result.set(r);

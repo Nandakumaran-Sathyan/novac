@@ -9,7 +9,14 @@ GET {{baseUrl}}/health
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
-{ "email": "admin@example.com", "password": "your-password" }
+{ "email": "you@example.com", "password": "your-password" }
+
+###
+# Create an account together with its shop (returns the same body as login).
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{ "fullName": "Your Name", "email": "you@example.com", "password": "Use-a-real-passw0rd", "shopName": "My Shop", "shopAddress": "1 Main Street" }
 
 ###
 GET {{baseUrl}}/api/dashboard/summary

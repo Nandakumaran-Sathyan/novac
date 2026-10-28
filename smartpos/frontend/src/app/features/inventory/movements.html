@@ -68,7 +68,7 @@
                   <td class="num">{{ m.quantityAfter }}</td>
                   <td class="hide-sm">
                     @if (m.saleId) {
-                      <a [routerLink]="['/sales', m.saleId]" class="mono">{{ m.invoiceNumber }}</a>
+                      <a [routerLink]="['/sales', m.saleId]" class="mono">{{ m.billNumber }}</a>
                     } @else {
                       {{ m.reason }}
                     }

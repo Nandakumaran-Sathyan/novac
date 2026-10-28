@@ -3,11 +3,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, Subscription } from 'rxjs';
+import { CustomersService } from '../../core/api/customers.service';
 import { ProductsService } from '../../core/api/products.service';
 import { SalesService } from '../../core/api/sales.service';
 import { SettingsService } from '../../core/api/settings.service';
 import { errorMessage } from '../../core/http/http-utils';
-import { PaymentMethod, Product, Sale } from '../../core/models';
+import { Customer, PaymentMethod, Product, Sale } from '../../core/models';
 import { ConfirmService } from '../../core/ui/confirm.service';
 import { Icon } from '../../shared/components/icon';
 import { EmptyState, ErrorAlert, Loading } from '../../shared/components/states';
@@ -24,6 +25,7 @@ import { addProduct, calculateTotals, CartLine, lineTotal, removeLine, setQuanti
 })
 export class Pos implements OnInit {
   private readonly productsApi = inject(ProductsService);
+  private readonly customersApi = inject(CustomersService);
   private readonly sales = inject(SalesService);
   private readonly confirm = inject(ConfirmService);
   private readonly destroyRef = inject(DestroyRef);
@@ -31,6 +33,7 @@ export class Pos implements OnInit {
 
   private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
   private searchRequest?: Subscription;
+  private customerRequest?: Subscription;
 
   protected readonly search = new FormControl('', { nonNullable: true });
   protected readonly products = signal<Product[]>([]);
@@ -40,7 +43,13 @@ export class Pos implements OnInit {
   protected readonly lines = signal<CartLine[]>([]);
   protected readonly discountPercent = signal(0);
   protected readonly paymentMethod = signal<PaymentMethod>('Cash');
-  protected readonly paymentMethods: PaymentMethod[] = ['Cash', 'Card', 'Other'];
+  protected readonly paymentMethods: PaymentMethod[] = ['Cash', 'Card', 'UPI', 'Other'];
+  /** Cash handed over by the customer; null means "exact amount". Only used for Cash. */
+  protected readonly amountReceived = signal<number | null>(null);
+
+  protected readonly customerSearch = new FormControl('', { nonNullable: true });
+  protected readonly customerMatches = signal<Customer[]>([]);
+  protected readonly customer = signal<Customer | null>(null);
   protected readonly submitting = signal(false);
   protected readonly checkoutError = signal<string | null>(null);
   protected readonly completedSale = signal<Sale | null>(null);
@@ -55,14 +64,50 @@ export class Pos implements OnInit {
     calculateTotals(this.lines(), this.discountInvalid() ? 0 : this.discountPercent(), this.taxRate()),
   );
   protected readonly itemCount = computed(() => this.lines().reduce((n, l) => n + l.quantity, 0));
-  protected readonly canCheckout = computed(() => this.lines().length > 0 && !this.discountInvalid() && !this.submitting());
+  /** Cash tendered below the total can't be accepted; leaving the box empty means exact payment. */
+  protected readonly paymentInvalid = computed(() => {
+    const received = this.amountReceived();
+    return this.paymentMethod() === 'Cash' && received !== null && Math.round(received * 100) < Math.round(this.totals().total * 100);
+  });
+  protected readonly changeDue = computed(() => {
+    const received = this.amountReceived();
+    if (this.paymentMethod() !== 'Cash' || received === null || this.paymentInvalid()) {
+      return 0;
+    }
+    return Math.round((received - this.totals().total) * 100) / 100;
+  });
+  protected readonly canCheckout = computed(
+    () => this.lines().length > 0 && !this.discountInvalid() && !this.paymentInvalid() && !this.submitting(),
+  );
   protected readonly lineTotal = lineTotal;
 
   ngOnInit(): void {
     this.search.valueChanges
       .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.loadProducts());
+    this.customerSearch.valueChanges
+      .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((term) => this.findCustomers(term));
     this.loadProducts();
+  }
+
+  private findCustomers(term: string): void {
+    this.customerRequest?.unsubscribe();
+    const search = term.trim();
+    if (search.length < 2) {
+      this.customerMatches.set([]);
+      return;
+    }
+    this.customerRequest = this.customersApi.list({ search, page: 1, pageSize: 5 }).subscribe({
+      next: (r) => this.customerMatches.set(r.items),
+      error: () => this.customerMatches.set([]),
+    });
+  }
+
+  protected pickCustomer(customer: Customer): void {
+    this.customer.set(customer);
+    this.customerSearch.setValue('', { emitEvent: false });
+    this.customerMatches.set([]);
   }
 
   protected loadProducts(): void {
@@ -83,12 +128,13 @@ export class Pos implements OnInit {
       });
   }
 
-  /** Enter in the search box: add an exact SKU match, or the only result. */
+  /** Enter in the search box: add an exact SKU or barcode match, or the only result. */
   protected addFromSearch(event: Event): void {
     event.preventDefault();
     const term = this.search.value.trim().toLowerCase();
     const results = this.products();
-    const match = results.find((p) => p.sku.toLowerCase() === term) ?? (results.length === 1 ? results[0] : undefined);
+    const match =
+      results.find((p) => p.sku.toLowerCase() === term || p.barcode === term) ?? (results.length === 1 ? results[0] : undefined);
     if (match && match.stockQuantity > 0) {
       this.add(match);
       this.search.setValue('');
@@ -125,6 +171,18 @@ export class Pos implements OnInit {
     this.discountPercent.set(Number.isNaN(value) ? 0 : value);
   }
 
+  protected onAmountReceivedInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).valueAsNumber;
+    this.amountReceived.set(Number.isNaN(value) ? null : value);
+  }
+
+  protected selectPayment(method: PaymentMethod): void {
+    this.paymentMethod.set(method);
+    if (method !== 'Cash') {
+      this.amountReceived.set(null);
+    }
+  }
+
   protected async clearCart(): Promise<void> {
     if (this.lines().length === 0) {
       return;
@@ -151,6 +209,8 @@ export class Pos implements OnInit {
         items: this.lines().map((l) => ({ productId: l.productId, quantity: l.quantity })),
         discountPercent: this.discountPercent(),
         paymentMethod: this.paymentMethod(),
+        ...(this.paymentMethod() === 'Cash' && this.amountReceived() !== null ? { amountPaid: this.amountReceived()! } : {}),
+        ...(this.customer() ? { customerId: this.customer()!.id } : {}),
       })
       .subscribe({
         next: (sale) => {
@@ -158,6 +218,8 @@ export class Pos implements OnInit {
           this.completedSale.set(sale);
           this.lines.set([]);
           this.discountPercent.set(0);
+          this.amountReceived.set(null);
+          this.customer.set(null);
           this.loadProducts(); // refresh stock figures
         },
         error: (err: unknown) => {
@@ -177,6 +239,10 @@ export class Pos implements OnInit {
     this.lines.set([]);
     this.discountPercent.set(0);
     this.paymentMethod.set('Cash');
+    this.amountReceived.set(null);
+    this.customer.set(null);
+    this.customerSearch.setValue('', { emitEvent: false });
+    this.customerMatches.set([]);
     this.checkoutError.set(null);
     this.completedSale.set(null);
   }

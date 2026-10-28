@@ -34,9 +34,9 @@ public static class StockRules
                 $"Adjustment would make stock negative: {onHand} on hand, change of {quantityChange}.");
     }
 
-    /// <summary>"Low" means at or below the reorder level, matching the dashboard's low-stock count.</summary>
-    public static StockStatus GetStatus(int onHand, int reorderLevel) =>
+    /// <summary>"Low" means at or below the low-stock threshold, matching the dashboard's low-stock count.</summary>
+    public static StockStatus GetStatus(int onHand, int lowStockThreshold) =>
         onHand <= 0 ? StockStatus.OutOfStock
-        : onHand <= reorderLevel ? StockStatus.Low
+        : onHand <= lowStockThreshold ? StockStatus.Low
         : StockStatus.InStock;
 }

@@ -6,7 +6,7 @@ import { Category, PagedResult, PageQuery, Product, ProductInput } from '../mode
 
 export interface ProductQuery extends PageQuery {
   search?: string;
-  categoryId?: number | null;
+  category?: string | null;
   includeInactive?: boolean;
 }
 
@@ -43,9 +43,5 @@ export class CategoriesService {
 
   list() {
     return this.http.get<Category[]>(this.url);
-  }
-
-  create(name: string, description: string | null = null) {
-    return this.http.post<Category>(this.url, { name, description });
   }
 }

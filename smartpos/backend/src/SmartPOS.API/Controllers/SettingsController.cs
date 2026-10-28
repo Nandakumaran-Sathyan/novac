@@ -8,8 +8,8 @@ namespace SmartPOS.API.Controllers;
 [Produces("application/json")]
 public sealed class SettingsController(ISaleService saleService) : ControllerBase
 {
-    /// <summary>Store name, currency, tax rate and the caller's maximum discount.</summary>
+    /// <summary>Shop name and address, currency, tax rate and the caller's maximum discount.</summary>
     [HttpGet("pos")]
     [ProducesResponseType<PosSettingsDto>(StatusCodes.Status200OK)]
-    public PosSettingsDto Pos() => saleService.GetPosSettings();
+    public Task<PosSettingsDto> Pos(CancellationToken cancellationToken) => saleService.GetPosSettingsAsync(cancellationToken);
 }

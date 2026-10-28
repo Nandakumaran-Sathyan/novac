@@ -1,6 +1,5 @@
 <Project>
-  <!-- Central package versions. EF Core is pinned to 10.0.12 because that is the
-       version MySql.EntityFrameworkCore 10.0.12 is built against. -->
+  <!-- Central package versions. -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <EfCoreVersion>10.0.12</EfCoreVersion>
@@ -10,7 +9,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EfCoreVersion)" />
-    <PackageVersion Include="MySql.EntityFrameworkCore" Version="10.0.12" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.12" />

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartPOS.Application.Common;
+using SmartPOS.Core.Enums;
 
 namespace SmartPOS.Application.Reports;
 
@@ -19,7 +20,7 @@ public sealed record DailySalesReport(
     decimal Total,
     decimal AverageSale);
 
-/// <summary>Revenue is the sum of line totals, i.e. before sale-level discounts and tax.</summary>
+/// <summary>Revenue is net sales: line totals after discount and excluding tax. Profit is revenue minus cost.</summary>
 public sealed record TopProductRow(
     int ProductId,
     string Sku,
@@ -48,8 +49,8 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
         // Fetch the few columns needed and bucket by store-local date in memory. Grouping in SQL
         // would need the database to know the store's time zone, which MySQL may not have loaded.
         var sales = await db.Sales.AsNoTracking()
-            .Where(s => s.CreatedAt >= fromUtc && s.CreatedAt < toUtc)
-            .Select(s => new { s.CreatedAt, s.Subtotal, s.DiscountAmount, s.TaxAmount, s.Total })
+            .Where(s => s.Status == SaleStatus.Completed && s.CreatedAt >= fromUtc && s.CreatedAt < toUtc)
+            .Select(s => new { s.CreatedAt, s.Subtotal, s.DiscountAmount, s.TaxAmount, s.TotalAmount })
             .ToListAsync(cancellationToken);
 
         var byDate = sales.ToLookup(s => calendar.ToStoreDate(s.CreatedAt));
@@ -58,10 +59,10 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
         {
             var d = byDate[date].ToList();
             days.Add(new DailySalesRow(date, d.Count, d.Sum(s => s.Subtotal), d.Sum(s => s.DiscountAmount),
-                d.Sum(s => s.TaxAmount), d.Sum(s => s.Total)));
+                d.Sum(s => s.TaxAmount), d.Sum(s => s.TotalAmount)));
         }
 
-        var total = sales.Sum(s => s.Total);
+        var total = sales.Sum(s => s.TotalAmount);
         var average = sales.Count == 0 ? 0 : Math.Round(total / sales.Count, 2, MidpointRounding.AwayFromZero);
         return new DailySalesReport(start, end, days, sales.Count, total, average);
     }
@@ -74,7 +75,7 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
         var (fromUtc, toUtc) = calendar.ToUtcRange(start, end);
 
         var rows = await db.SaleItems.AsNoTracking()
-            .Where(i => i.Sale.CreatedAt >= fromUtc && i.Sale.CreatedAt < toUtc)
+            .Where(i => i.Sale.Status == SaleStatus.Completed && i.Sale.CreatedAt >= fromUtc && i.Sale.CreatedAt < toUtc)
             .GroupBy(i => i.ProductId)
             .Select(g => new
             {
@@ -82,7 +83,7 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
                 Sku = g.Max(i => i.Sku),
                 ProductName = g.Max(i => i.ProductName),
                 QuantitySold = g.Sum(i => i.Quantity),
-                Revenue = g.Sum(i => i.LineTotal),
+                Revenue = g.Sum(i => i.LineTotal - i.TaxAmount),
                 Cost = g.Sum(i => i.UnitCost * i.Quantity)
             })
             .ToListAsync(cancellationToken);

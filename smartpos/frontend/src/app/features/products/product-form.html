@@ -33,33 +33,35 @@
             @if (invalid('name')) { <span class="field-error">Name must be 2–150 characters.</span> }
           </div>
 
-          <div class="field span-2">
-            <label for="category" class="required">Category</label>
-            <div class="category-row">
-              <select id="category" class="select" formControlName="categoryId" [attr.aria-invalid]="invalid('categoryId')">
-                <option [ngValue]="null" disabled>Select a category</option>
-                @for (c of categories(); track c.id) {
-                  <option [ngValue]="c.id">{{ c.name }}</option>
-                }
-              </select>
-              <button type="button" class="btn btn-secondary" (click)="addingCategory.set(!addingCategory())" [attr.aria-expanded]="addingCategory()">
-                New category
-              </button>
-            </div>
-            @if (invalid('categoryId')) { <span class="field-error">Select a category.</span> }
-            @if (addingCategory()) {
-              <div class="category-row">
-                <label for="new-category" class="sr-only">New category name</label>
-                <input id="new-category" class="input" placeholder="Category name" [formControl]="newCategoryName" (keydown.enter)="$event.preventDefault(); addCategory()">
-                <button type="button" class="btn btn-primary" (click)="addCategory()">Add</button>
-              </div>
+          <div class="field">
+            <label for="barcode">Barcode</label>
+            <input id="barcode" class="input mono" formControlName="barcode" inputmode="numeric" autocomplete="off" [attr.aria-invalid]="invalid('barcode')" aria-describedby="barcode-help">
+            @if (invalid('barcode')) {
+              <span class="field-error">Digits only, up to 50.</span>
+            } @else {
+              <span id="barcode-help" class="hint">Optional; the number printed under the manufacturer's barcode. Scan it at the POS.</span>
             }
           </div>
 
           <div class="field">
-            <label for="sellingPrice" class="required">Selling price</label>
-            <input id="sellingPrice" type="number" inputmode="decimal" min="0" step="0.01" class="input" formControlName="sellingPrice" [attr.aria-invalid]="invalid('sellingPrice')">
-            @if (invalid('sellingPrice')) { <span class="field-error">Enter a price of 0 or more with at most 2 decimals.</span> }
+            <label for="category" class="required">Category</label>
+            <input id="category" class="input" formControlName="category" list="category-options" autocomplete="off" [attr.aria-invalid]="invalid('category')" aria-describedby="category-help">
+            <datalist id="category-options">
+              @for (c of categories(); track c.name) {
+                <option [value]="c.name"></option>
+              }
+            </datalist>
+            @if (invalid('category')) {
+              <span class="field-error">Category must be 2–100 characters.</span>
+            } @else {
+              <span id="category-help" class="hint">Pick an existing one or type a new name.</span>
+            }
+          </div>
+
+          <div class="field">
+            <label for="price" class="required">Selling price</label>
+            <input id="price" type="number" inputmode="decimal" min="0" step="0.01" class="input" formControlName="price" [attr.aria-invalid]="invalid('price')">
+            @if (invalid('price')) { <span class="field-error">Enter a price of 0 or more with at most 2 decimals.</span> }
           </div>
 
           <div class="field">
@@ -81,10 +83,16 @@
           </div>
 
           <div class="field">
-            <label for="reorderLevel" class="required">Reorder level</label>
-            <input id="reorderLevel" type="number" inputmode="numeric" min="0" step="1" class="input" formControlName="reorderLevel" [attr.aria-invalid]="invalid('reorderLevel')" aria-describedby="reorder-help">
-            @if (invalid('reorderLevel')) { <span class="field-error">Enter a whole number of 0 or more.</span> }
-            @else { <span id="reorder-help" class="hint">Flagged as low stock at or below this quantity.</span> }
+            <label for="lowStockThreshold" class="required">Low-stock level</label>
+            <input id="lowStockThreshold" type="number" inputmode="numeric" min="0" step="1" class="input" formControlName="lowStockThreshold" [attr.aria-invalid]="invalid('lowStockThreshold')" aria-describedby="low-help">
+            @if (invalid('lowStockThreshold')) { <span class="field-error">Enter a whole number of 0 or more.</span> }
+            @else { <span id="low-help" class="hint">Flagged as low stock at or below this quantity.</span> }
+          </div>
+
+          <div class="field">
+            <label for="expiryDate">Expiry date</label>
+            <input id="expiryDate" type="date" class="input" formControlName="expiryDate">
+            <span class="hint">Optional, for perishable goods.</span>
           </div>
 
           <div class="field span-2">

@@ -4,11 +4,10 @@
       <h1>Products</h1>
       <p>Catalogue, prices and stock levels</p>
     </div>
-    @if (auth.isAdmin()) {
-      <div class="page-actions">
+          <div class="page-actions">
         <a routerLink="/products/new" class="btn btn-primary"><app-icon name="plus" [size]="16" /> New product</a>
       </div>
-    }
+    
   </div>
 
   <section class="card">
@@ -17,15 +16,15 @@
         <label for="product-search">Search</label>
         <div class="search-input">
           <app-icon name="search" [size]="16" />
-          <input id="product-search" type="search" class="input" placeholder="Name or SKU" [formControl]="search">
+          <input id="product-search" type="search" class="input" placeholder="Name, SKU or barcode" [formControl]="search">
         </div>
       </div>
       <div class="field">
         <label for="product-category">Category</label>
-        <select id="product-category" class="select" [formControl]="categoryId">
+        <select id="product-category" class="select" [formControl]="category">
           <option [ngValue]="null">All categories</option>
-          @for (c of categories(); track c.id) {
-            <option [ngValue]="c.id">{{ c.name }}</option>
+          @for (c of categories(); track c.name) {
+            <option [ngValue]="c.name">{{ c.name }}</option>
           }
         </select>
       </div>
@@ -41,9 +40,7 @@
           <app-empty-state icon="search" title="No matching products" message="Try a different name, SKU or category." />
         } @else {
           <app-empty-state icon="package" title="No products yet" message="Add your first product to start selling.">
-            @if (auth.isAdmin()) {
-              <a routerLink="/products/new" class="btn btn-primary btn-sm">New product</a>
-            }
+            <a routerLink="/products/new" class="btn btn-primary btn-sm">New product</a>
           </app-empty-state>
         }
       } @else {
@@ -54,29 +51,30 @@
                 <th scope="col">Product</th>
                 <th scope="col" class="hide-sm">Category</th>
                 <th scope="col" class="num">Price</th>
-                @if (auth.isAdmin()) { <th scope="col" class="num hide-sm">Cost</th> }
+                <th scope="col" class="num hide-sm">Cost</th>
                 <th scope="col" class="num">Stock</th>
+                <th scope="col" class="hide-sm">Expiry</th>
                 <th scope="col">Status</th>
-                @if (auth.isAdmin()) { <th scope="col" class="actions"><span class="sr-only">Actions</span></th> }
+                <th scope="col" class="actions"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               @for (p of r.items; track p.id) {
                 <tr>
-                  <td><div class="cell-title">{{ p.name }}</div><div class="cell-sub mono">{{ p.sku }}</div></td>
-                  <td class="hide-sm">{{ p.categoryName }}</td>
-                  <td class="num">{{ p.sellingPrice | money }}</td>
-                  @if (auth.isAdmin()) { <td class="num hide-sm muted">{{ p.costPrice | money }}</td> }
+                  <td><div class="cell-title">{{ p.name }}</div><div class="cell-sub mono">{{ p.sku }}@if (p.barcode) { · {{ p.barcode }} }</div></td>
+                  <td class="hide-sm">{{ p.category }}</td>
+                  <td class="num">{{ p.price | money }}</td>
+                  <td class="num hide-sm muted">{{ p.costPrice | money }}</td>
                   <td class="num">
                     <span [class.text-danger]="p.isLowStock">{{ p.stockQuantity }}</span>
                     @if (p.isLowStock) { <span class="sr-only">(low stock)</span> }
                   </td>
+                  <td class="hide-sm nowrap muted">{{ p.expiryDate ? (p.expiryDate | date: 'MMM d, y') : '—' }}</td>
                   <td>
                     @if (p.isActive) { <span class="badge badge-success">Active</span> }
                     @else { <span class="badge badge-neutral">Inactive</span> }
                   </td>
-                  @if (auth.isAdmin()) {
-                    <td class="actions">
+                                      <td class="actions">
                       <a [routerLink]="['/products', p.id, 'edit']" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Edit ' + p.name">
                         <app-icon name="edit" [size]="16" />
                       </a>
@@ -84,7 +82,7 @@
                         <app-icon name="trash" [size]="16" />
                       </button>
                     </td>
-                  }
+                  
                 </tr>
               }
             </tbody>

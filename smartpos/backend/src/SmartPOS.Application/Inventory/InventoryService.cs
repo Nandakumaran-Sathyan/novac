@@ -11,63 +11,67 @@ public sealed class InventoryService(
     ICurrentUser currentUser,
     StoreCalendar calendar) : IInventoryService
 {
-    internal static readonly Expression<Func<Product, InventoryItemDto>> ToItemDto = p => new InventoryItemDto(
-        p.Id, p.Sku, p.Name, p.Category.Name, p.StockQuantity, p.ReorderLevel,
-        p.StockQuantity <= 0 ? StockStatus.OutOfStock
-            : p.StockQuantity <= p.ReorderLevel ? StockStatus.Low
+    internal static readonly Expression<Func<SmartPOS.Core.Entities.Inventory, InventoryItemDto>> ToItemDto = i => new InventoryItemDto(
+        i.ProductId, i.Product.Sku, i.Product.Name, i.Product.Category, i.StockQuantity, i.LowStockThreshold,
+        i.StockQuantity <= 0 ? StockStatus.OutOfStock
+            : i.StockQuantity <= i.LowStockThreshold ? StockStatus.Low
             : StockStatus.InStock,
-        p.IsActive, p.UpdatedAt);
+        i.Product.IsActive, i.LastUpdated);
 
     private static readonly Expression<Func<StockMovement, StockMovementDto>> ToMovementDto = m => new StockMovementDto(
         m.Id, m.ProductId, m.Product.Sku, m.Product.Name, m.QuantityChange, m.QuantityAfter, m.Type, m.Reason,
-        m.SaleId, m.Sale != null ? m.Sale.InvoiceNumber : null, m.User != null ? m.User.FullName : null, m.CreatedAt);
+        m.SaleId, m.Sale != null ? m.Sale.BillNumber : null, m.User != null ? m.User.FullName : null, m.CreatedAt);
 
     public async Task<PagedResult<InventoryItemDto>> ListAsync(InventoryQuery query, CancellationToken cancellationToken)
     {
-        var products = db.Products.AsNoTracking();
+        var items = db.Inventories.AsNoTracking();
         if (!query.IncludeInactive)
-            products = products.Where(p => p.IsActive);
-        if (query.CategoryId is { } categoryId)
-            products = products.Where(p => p.CategoryId == categoryId);
+            items = items.Where(i => i.Product.IsActive);
+        if (!string.IsNullOrWhiteSpace(query.Category))
+        {
+            var category = query.Category.Trim();
+            items = items.Where(i => i.Product.Category == category);
+        }
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = SearchPattern.Contains(query.Search);
-            products = products.Where(p =>
-                EF.Functions.Like(p.Name, pattern, SearchPattern.EscapeCharacter) ||
-                EF.Functions.Like(p.Sku, pattern, SearchPattern.EscapeCharacter));
+            items = items.Where(i =>
+                EF.Functions.Like(i.Product.Name.ToLower(), pattern, SearchPattern.EscapeCharacter) ||
+                EF.Functions.Like(i.Product.Sku.ToLower(), pattern, SearchPattern.EscapeCharacter));
         }
-        products = query.Filter switch
+        items = query.Filter switch
         {
-            InventoryFilter.Low => products.Where(p => p.StockQuantity <= p.ReorderLevel),
-            InventoryFilter.OutOfStock => products.Where(p => p.StockQuantity <= 0),
-            _ => products
+            InventoryFilter.Low => items.Where(i => i.StockQuantity <= i.LowStockThreshold),
+            InventoryFilter.OutOfStock => items.Where(i => i.StockQuantity <= 0),
+            _ => items
         };
 
-        return await products
-            // Most urgent first: lowest stock relative to reorder level.
-            .OrderBy(p => p.StockQuantity - p.ReorderLevel).ThenBy(p => p.Name)
+        return await items
+            // Most urgent first: lowest stock relative to the threshold.
+            .OrderBy(i => i.StockQuantity - i.LowStockThreshold).ThenBy(i => i.Product.Name)
             .Select(ToItemDto)
             .ToPagedResultAsync(query, cancellationToken);
     }
 
     public async Task<StockMovementDto> AdjustAsync(StockAdjustmentRequest request, CancellationToken cancellationToken)
     {
-        var product = await db.Products.AsNoTracking()
-                          .Where(p => p.Id == request.ProductId)
-                          .Select(p => new { p.Id, p.StockQuantity })
-                          .SingleOrDefaultAsync(cancellationToken)
-                      ?? throw NotFoundException.For("Product", request.ProductId);
+        var item = await db.Inventories.AsNoTracking()
+                       .Where(i => i.ProductId == request.ProductId)
+                       .Select(i => new { i.ProductId, i.StockQuantity })
+                       .SingleOrDefaultAsync(cancellationToken)
+                   ?? throw NotFoundException.For("Product", request.ProductId);
 
-        StockRules.EnsureValidAdjustment(product.StockQuantity, request.QuantityChange);
+        StockRules.EnsureValidAdjustment(item.StockQuantity, request.QuantityChange);
 
         await using var transaction = await db.BeginTransactionAsync(cancellationToken);
 
-        var newQuantity = await db.TryChangeStockAsync(product.Id, request.QuantityChange, cancellationToken)
+        var newQuantity = await db.TryChangeStockAsync(item.ProductId, request.QuantityChange, cancellationToken)
                           ?? throw new ConflictException("Stock changed while adjusting and the adjustment would now make it negative. Reload and try again.");
 
         var movement = new StockMovement
         {
-            ProductId = product.Id,
+            ShopId = currentUser.ShopId,
+            ProductId = item.ProductId,
             QuantityChange = request.QuantityChange,
             QuantityAfter = newQuantity,
             Type = StockMovementType.Adjustment,

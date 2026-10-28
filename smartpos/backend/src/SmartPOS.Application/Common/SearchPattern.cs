@@ -2,19 +2,17 @@ namespace SmartPOS.Application.Common;
 
 public static class SearchPattern
 {
-    /// <summary>
-    /// '!' rather than the usual '\': MySQL treats a backslash inside a string literal as an escape,
-    /// so the provider's generated <c>ESCAPE '\'</c> clause is a syntax error on MySQL.
-    /// </summary>
+    /// <summary>'!' rather than '\': it needs no special handling in any SQL string literal.</summary>
     public const string EscapeCharacter = "!";
 
     /// <summary>
-    /// Builds a "contains" LIKE pattern, escaping the LIKE wildcards in user input. Use with
-    /// <c>EF.Functions.Like(column, pattern, SearchPattern.EscapeCharacter)</c>.
+    /// Builds a lower-case "contains" LIKE pattern, escaping the LIKE wildcards in user input. Searches
+    /// are case-insensitive on every database (PostgreSQL's LIKE is case-sensitive), so use it against a
+    /// lower-cased column: <c>EF.Functions.Like(column.ToLower(), pattern, SearchPattern.EscapeCharacter)</c>.
     /// </summary>
     public static string Contains(string term)
     {
-        var escaped = term.Trim()
+        var escaped = term.Trim().ToLowerInvariant()
             .Replace("!", "!!")
             .Replace("%", "!%")
             .Replace("_", "!_");

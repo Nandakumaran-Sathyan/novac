@@ -6,6 +6,7 @@ import {
   CreateSaleRequest,
   DailySalesReport,
   DashboardSummary,
+  Insights,
   PagedResult,
   PageQuery,
   Sale,
@@ -57,5 +58,9 @@ export class DashboardService {
 
   summary() {
     return this.http.get<DashboardSummary>(`${environment.apiUrl}/dashboard/summary`);
+  }
+
+  insights(days: number) {
+    return this.http.get<Insights>(`${environment.apiUrl}/dashboard/insights`, { params: toHttpParams({ days }) });
   }
 }

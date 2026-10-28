@@ -6,9 +6,9 @@ const line = (unitPrice: number, quantity: number, available = 100, productId = 
   productId, sku: `SKU-${productId}`, name: `Item ${productId}`, unitPrice, quantity, available,
 });
 
-const product = (id: number, sellingPrice: number, stockQuantity: number): Product => ({
-  id, sku: `SKU-${id}`, name: `Item ${id}`, description: null, categoryId: 1, categoryName: 'Test',
-  sellingPrice, costPrice: 0, stockQuantity, reorderLevel: 0, isLowStock: false, isActive: true,
+const product = (id: number, price: number, stockQuantity: number): Product => ({
+  id, sku: `SKU-${id}`, name: `Item ${id}`, barcode: null, description: null, category: 'Test',
+  price, costPrice: 0, stockQuantity, lowStockThreshold: 0, isLowStock: false, expiryDate: null, isActive: true,
   createdAt: '', updatedAt: '',
 });
 

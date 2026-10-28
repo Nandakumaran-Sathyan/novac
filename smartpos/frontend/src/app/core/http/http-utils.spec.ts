@@ -27,7 +27,7 @@ describe('errorMessage', () => {
 
 describe('toHttpParams', () => {
   it('skips empty values', () => {
-    const params = toHttpParams({ search: '', categoryId: null, page: 2, from: undefined, includeInactive: false });
+    const params = toHttpParams({ search: '', category: null, page: 2, from: undefined, includeInactive: false });
     expect(params.keys()).toEqual(['page', 'includeInactive']);
     expect(params.get('includeInactive')).toBe('false');
   });

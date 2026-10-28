@@ -1,13 +1,10 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartPOS.API.Auth;
 using SmartPOS.Application.Reports;
 
 namespace SmartPOS.API.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-[Authorize(Roles = Roles.Admin)]
 [Produces("application/json")]
 public sealed class ReportsController(IReportService reportService) : ControllerBase
 {
@@ -21,7 +18,7 @@ public sealed class ReportsController(IReportService reportService) : Controller
     public Task<DailySalesReport> DailySales([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken cancellationToken) =>
         reportService.GetDailySalesAsync(from, to, cancellationToken);
 
-    /// <summary>Best-selling products by revenue (line totals before sale-level discount).</summary>
+    /// <summary>Best-selling products by revenue (net of discount and tax).</summary>
     [HttpGet("top-products")]
     [ProducesResponseType<IReadOnlyList<TopProductRow>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

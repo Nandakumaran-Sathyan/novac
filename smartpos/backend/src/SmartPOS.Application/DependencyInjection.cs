@@ -3,12 +3,12 @@ using Microsoft.Extensions.DependencyInjection;
 using SmartPOS.Application.Auth;
 using SmartPOS.Application.Categories;
 using SmartPOS.Application.Common;
+using SmartPOS.Application.Customers;
 using SmartPOS.Application.Dashboard;
 using SmartPOS.Application.Inventory;
 using SmartPOS.Application.Products;
 using SmartPOS.Application.Reports;
 using SmartPOS.Application.Sales;
-using SmartPOS.Application.Users;
 
 namespace SmartPOS.Application;
 
@@ -30,13 +30,14 @@ public static class DependencyInjection
         services.AddSingleton<StoreCalendar>();
 
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<ISaleService, SaleService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IInsightsService, InsightsService>();
         return services;
     }
 }

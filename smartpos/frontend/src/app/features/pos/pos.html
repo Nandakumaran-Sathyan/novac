@@ -6,7 +6,7 @@
         <app-icon name="search" [size]="16" />
         <label for="pos-search" class="sr-only">Search products</label>
         <input #searchInput id="pos-search" type="search" class="input input-lg" autocomplete="off" autofocus
-               placeholder="Search name or scan SKU — press Enter to add" [formControl]="search"
+               placeholder="Search name or scan barcode/SKU — press Enter to add" [formControl]="search"
                (keydown.enter)="addFromSearch($event)">
       </div>
       <p class="hint">Shortcuts: <kbd>/</kbd> search · <kbd>Enter</kbd> add match · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> complete sale</p>
@@ -24,11 +24,11 @@
         @for (p of products(); track p.id) {
           <li>
             <button type="button" class="product-tile" (click)="add(p)" [disabled]="p.stockQuantity - inCart(p.id) <= 0"
-                    [attr.aria-label]="'Add ' + p.name + ', ' + (p.sellingPrice | money) + ', ' + p.stockQuantity + ' in stock'">
+                    [attr.aria-label]="'Add ' + p.name + ', ' + (p.price | money) + ', ' + p.stockQuantity + ' in stock'">
               <span class="tile-name">{{ p.name }}</span>
               <span class="tile-sku mono">{{ p.sku }}</span>
               <span class="tile-bottom">
-                <span class="tile-price">{{ p.sellingPrice | money }}</span>
+                <span class="tile-price">{{ p.price | money }}</span>
                 @if (p.stockQuantity <= 0) {
                   <span class="badge badge-danger">Out of stock</span>
                 } @else {
@@ -52,11 +52,14 @@
       <div class="sale-complete" role="status">
         <span class="complete-icon"><app-icon name="check" [size]="26" /></span>
         <h3>Sale completed</h3>
-        <p class="mono">{{ sale.invoiceNumber }}</p>
-        <p class="complete-total">{{ sale.total | money }}</p>
-        <p class="muted">Paid by {{ sale.paymentMethod }}</p>
+        <p class="mono">{{ sale.billNumber }}</p>
+        <p class="complete-total">{{ sale.totalAmount | money }}</p>
+        <p class="muted">Paid by {{ sale.paymentMethod }}@if (sale.customerName) { · {{ sale.customerName }} }</p>
+        @if (sale.changeAmount > 0) {
+          <p class="complete-change"><strong>Change due: {{ sale.changeAmount | money }}</strong> <span class="muted">(received {{ sale.amountPaid | money }})</span></p>
+        }
         <div class="complete-actions">
-          <a [routerLink]="['/sales', sale.id]" [queryParams]="{ print: 1 }" class="btn btn-secondary"><app-icon name="printer" [size]="16" /> Print invoice</a>
+          <a [routerLink]="['/sales', sale.id]" [queryParams]="{ print: 1 }" class="btn btn-secondary"><app-icon name="printer" [size]="16" /> Print bill</a>
           <button type="button" class="btn btn-primary" (click)="newSale()">New sale</button>
         </div>
       </div>
@@ -94,22 +97,58 @@
         @if (checkoutError()) {
           <app-error-alert [message]="checkoutError()!" [retryable]="false" />
         }
+        <div class="field customer-field">
+          @if (customer(); as c) {
+            <span class="field-label">Customer</span>
+            <div class="customer-chip">
+              <span><strong>{{ c.name }}</strong> <span class="muted mono">{{ c.phone }}</span></span>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="customer.set(null)" [attr.aria-label]="'Remove customer ' + c.name">Remove</button>
+            </div>
+          } @else {
+            <label for="customer-search">Customer <span class="muted">(optional)</span></label>
+            <input id="customer-search" type="search" class="input" autocomplete="off" placeholder="Search name or phone" [formControl]="customerSearch">
+            @if (customerMatches().length > 0) {
+              <ul class="customer-matches">
+                @for (m of customerMatches(); track m.id) {
+                  <li><button type="button" (click)="pickCustomer(m)">{{ m.name }} <span class="muted mono">{{ m.phone }}</span></button></li>
+                }
+              </ul>
+            } @else if (customerSearch.value.trim().length >= 2) {
+              <span class="hint">No match. <a routerLink="/customers">Add a customer</a></span>
+            }
+          }
+        </div>
+
         <div class="checkout-row">
           <div class="field">
             <label for="discount">Discount %</label>
             <input id="discount" type="number" class="input" min="0" [max]="maxDiscount()" step="0.5" [value]="discountPercent()"
                    (input)="onDiscountInput($event)" [attr.aria-invalid]="discountInvalid()" aria-describedby="discount-help">
-            <span id="discount-help" class="hint" [class.field-error]="discountInvalid()">Max {{ maxDiscount() }}% for your role</span>
+            <span id="discount-help" class="hint" [class.field-error]="discountInvalid()">Max {{ maxDiscount() }}% allowed</span>
           </div>
           <div class="field">
             <span class="field-label" id="payment-label">Payment</span>
             <div class="segmented" role="group" aria-labelledby="payment-label">
               @for (m of paymentMethods; track m) {
-                <button type="button" [attr.aria-pressed]="paymentMethod() === m" (click)="paymentMethod.set(m)">{{ m }}</button>
+                <button type="button" [attr.aria-pressed]="paymentMethod() === m" (click)="selectPayment(m)">{{ m }}</button>
               }
             </div>
           </div>
         </div>
+
+        @if (paymentMethod() === 'Cash') {
+          <div class="field">
+            <label for="received">Cash received <span class="muted">(optional)</span></label>
+            <input id="received" type="number" inputmode="decimal" class="input" min="0" step="0.01" [value]="amountReceived() ?? ''"
+                   (input)="onAmountReceivedInput($event)" [attr.aria-invalid]="paymentInvalid()" aria-describedby="received-help"
+                   placeholder="Leave empty for exact amount">
+            @if (paymentInvalid()) {
+              <span id="received-help" class="field-error">Less than the total of {{ totals().total | money }}.</span>
+            } @else if (amountReceived() !== null) {
+              <span id="received-help" class="hint">Change due: <strong>{{ changeDue() | money }}</strong></span>
+            }
+          </div>
+        }
 
         <dl class="totals">
           <div><dt>Subtotal</dt><dd>{{ totals().subtotal | money }}</dd></div>

@@ -7,6 +7,7 @@ public class SearchPatternTests
     [Theory]
     [InlineData("milk", "%milk%")]
     [InlineData("  milk ", "%milk%")]
+    [InlineData("Cola 500ML", "%cola 500ml%")] // lower-cased: PostgreSQL LIKE is case-sensitive
     [InlineData("50%", "%50!%%")]
     [InlineData("a_b", "%a!_b%")]
     [InlineData("wow!", "%wow!!%")]

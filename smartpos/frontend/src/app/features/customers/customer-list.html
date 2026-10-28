@@ -1,0 +1,94 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Customers</h1>
+      <p>People you sell to. Attach one to a sale at the POS.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="16" /> New customer</button>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <div class="field grow">
+        <label for="customer-search">Search</label>
+        <div class="search-input">
+          <app-icon name="search" [size]="16" />
+          <input id="customer-search" type="search" class="input" placeholder="Name or phone" [formControl]="search">
+        </div>
+      </div>
+    </div>
+
+    @if (error()) {
+      <div class="card-body"><app-error-alert [message]="error()!" (retry)="load()" /></div>
+    } @else if (loading() && !result()) {
+      <app-loading label="Loading customers…" />
+    } @else if (result(); as r) {
+      @if (r.items.length === 0) {
+        @if (search.value.trim()) {
+          <app-empty-state icon="search" title="No matching customers" message="Try a different name or phone number." />
+        } @else {
+          <app-empty-state icon="user" title="No customers yet" message="Add a customer to attach them to sales.">
+            <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">New customer</button>
+          </app-empty-state>
+        }
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Phone</th>
+                <th scope="col" class="num">Loyalty points</th>
+                <th scope="col" class="hide-sm">Added</th>
+                <th scope="col" class="actions"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of r.items; track c.id) {
+                <tr>
+                  <td class="cell-title">{{ c.name }}</td>
+                  <td class="mono">{{ c.phone }}</td>
+                  <td class="num">{{ c.loyaltyPoints }}</td>
+                  <td class="hide-sm muted nowrap">{{ c.createdAt | date: 'MMM d, y' }}</td>
+                  <td class="actions">
+                    <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(c)" [attr.aria-label]="'Edit ' + c.name">
+                      <app-icon name="edit" [size]="16" /> Edit
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-pagination [page]="r.page" [pageSize]="r.pageSize" [totalCount]="r.totalCount" [totalPages]="r.totalPages"
+                        (pageChange)="goToPage($event)" />
+      }
+    }
+  </section>
+</div>
+
+<app-modal [open]="editing() !== null" [title]="isNew() ? 'New customer' : 'Edit customer'" [busy]="saving()" (closed)="close()">
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <div class="modal-body">
+      @if (formError()) {
+        <app-error-alert [message]="formError()!" [retryable]="false" />
+      }
+      <div class="field">
+        <label for="customer-name" class="required">Name</label>
+        <input id="customer-name" class="input" formControlName="name" autocomplete="off" [attr.aria-invalid]="invalid('name')">
+        @if (invalid('name')) { <span class="field-error">Name must be 2–100 characters.</span> }
+      </div>
+      <div class="field">
+        <label for="customer-phone" class="required">Phone</label>
+        <input id="customer-phone" type="tel" class="input" formControlName="phone" autocomplete="off" [attr.aria-invalid]="invalid('phone')" aria-describedby="phone-help">
+        <span id="phone-help" class="hint" [class.field-error]="invalid('phone')">7–20 digits; spaces, “+”, “-” and brackets are allowed. Each phone number can belong to one customer.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="saving()">Cancel</button>
+      <button type="submit" class="btn btn-primary" [disabled]="saving()">{{ saving() ? 'Saving…' : isNew() ? 'Add customer' : 'Save changes' }}</button>
+    </div>
+  </form>
+</app-modal>

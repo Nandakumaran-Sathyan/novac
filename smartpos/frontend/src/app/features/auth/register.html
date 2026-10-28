@@ -1,0 +1,63 @@
+<div class="login-page">
+  <div class="login-card card">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">S</span>
+      <div>
+        <h1>Create your account</h1>
+        <p class="muted">Set up your shop on SmartPOS</p>
+      </div>
+    </div>
+
+    @if (error()) {
+      <div class="alert alert-error" role="alert">
+        <app-icon name="alert" />
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label for="shopName" class="required">Shop name</label>
+        <input id="shopName" class="input" formControlName="shopName" autocomplete="organization" autofocus [attr.aria-invalid]="invalid('shopName')">
+        @if (invalid('shopName')) { <span class="field-error">Shop name must be 2–150 characters.</span> }
+      </div>
+
+      <div class="field">
+        <label for="shopAddress">Shop address</label>
+        <input id="shopAddress" class="input" formControlName="shopAddress" autocomplete="street-address" [attr.aria-invalid]="invalid('shopAddress')">
+        @if (invalid('shopAddress')) { <span class="field-error">At most 250 characters.</span> }
+      </div>
+
+      <div class="field">
+        <label for="fullName" class="required">Your name</label>
+        <input id="fullName" class="input" formControlName="fullName" autocomplete="name" [attr.aria-invalid]="invalid('fullName')">
+        @if (invalid('fullName')) { <span class="field-error">Name must be 2–100 characters.</span> }
+      </div>
+
+      <div class="field">
+        <label for="email" class="required">Email</label>
+        <input id="email" type="email" class="input" formControlName="email" autocomplete="username" [attr.aria-invalid]="invalid('email')">
+        @if (invalid('email')) { <span class="field-error">Enter a valid email address.</span> }
+      </div>
+
+      <div class="field">
+        <label for="password" class="required">Password</label>
+        <div class="password">
+          <input id="password" class="input" formControlName="password" autocomplete="new-password"
+                 [type]="showPassword() ? 'text' : 'password'" [attr.aria-invalid]="invalid('password')" aria-describedby="password-help">
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="showPassword.set(!showPassword())"
+                  [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showPassword()">
+            <app-icon name="eye" [size]="16" />
+          </button>
+        </div>
+        <span id="password-help" class="hint" [class.field-error]="invalid('password')">At least 8 characters with a letter and a digit.</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg btn-block" [disabled]="submitting()">
+        {{ submitting() ? 'Creating account…' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="hint footer-hint">Already have an account? <a routerLink="/login">Sign in</a>.</p>
+  </div>
+</div>

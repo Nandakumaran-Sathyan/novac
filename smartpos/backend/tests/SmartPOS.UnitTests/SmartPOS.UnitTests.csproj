@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\SmartPOS.Application\SmartPOS.Application.csproj" />
+    <ProjectReference Include="..\..\src\SmartPOS.Infrastructure\SmartPOS.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

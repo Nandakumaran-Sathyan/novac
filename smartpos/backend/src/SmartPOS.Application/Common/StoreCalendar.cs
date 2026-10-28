@@ -17,6 +17,10 @@ public sealed class StoreCalendar(IOptions<StoreOptions> options, TimeProvider t
     public DateOnly ToStoreDate(DateTime utc) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), _zone));
 
+    /// <summary>The store-local wall-clock time of a UTC timestamp (used for hour-of-day and weekday patterns).</summary>
+    public DateTime ToStoreTime(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), _zone);
+
     public DateTime StartOfDayUtc(DateOnly date) =>
         TimeZoneInfo.ConvertTimeToUtc(date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), _zone);
 

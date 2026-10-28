@@ -102,3 +102,11 @@ kbd {
   .line-total { text-align: left; }
   .checkout-row { grid-template-columns: 1fr; }
 }
+
+.customer-field { position: relative; }
+.customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-muted); }
+.customer-matches { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+.customer-matches button { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.customer-matches button:hover, .customer-matches button:focus-visible { background: var(--color-surface-muted); }
+.complete-change { margin: 4px 0 0; }
+.customer-chip .mono { margin-left: 8px; }

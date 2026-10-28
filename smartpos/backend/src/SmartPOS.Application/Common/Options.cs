@@ -2,11 +2,15 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SmartPOS.Application.Common;
 
-/// <summary>Bound from the "Store" configuration section.</summary>
+/// <summary>
+/// Bound from the "Store" configuration section. Currency and time zone apply to every shop;
+/// per-shop values are on the roadmap.
+/// </summary>
 public sealed class StoreOptions
 {
     public const string SectionName = "Store";
 
+    /// <summary>Name given to the first shop created at bootstrap. After that the shop's own name (in the database) is used.</summary>
     [Required]
     public string Name { get; set; } = "SmartPOS Store";
 
@@ -30,11 +34,7 @@ public sealed class PosOptions
     [Range(0, 100)]
     public decimal TaxRatePercent { get; set; }
 
-    /// <summary>Highest sale-level discount a cashier may apply.</summary>
+    /// <summary>Highest sale-level discount a bill may carry.</summary>
     [Range(0, 100)]
-    public decimal MaxCashierDiscountPercent { get; set; } = 10;
-
-    /// <summary>Highest sale-level discount an admin may apply.</summary>
-    [Range(0, 100)]
-    public decimal MaxAdminDiscountPercent { get; set; } = 100;
+    public decimal MaxDiscountPercent { get; set; } = 100;
 }

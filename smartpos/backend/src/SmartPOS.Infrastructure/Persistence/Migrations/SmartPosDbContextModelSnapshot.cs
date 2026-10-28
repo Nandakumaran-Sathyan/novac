@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartPOS.Infrastructure.Persistence;
 
 #nullable disable
@@ -17,98 +18,157 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "10.0.12")
-                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            modelBuilder.Entity("SmartPOS.Core.Entities.Category", b =>
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Customer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
+                    b.Property<int>("LoyaltyPoints")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("ShopId", "Phone")
                         .IsUnique();
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Customers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Customers_LoyaltyPoints_NonNegative", "\"LoyaltyPoints\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Inventory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LowStockThreshold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StockQuantity")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique();
+
+                    b.HasIndex("ShopId", "StockQuantity");
+
+                    b.ToTable("Inventories", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Inventories_LowStockThreshold_NonNegative", "\"LowStockThreshold\" >= 0");
+
+                            t.HasCheckConstraint("CK_Inventories_StockQuantity_NonNegative", "\"StockQuantity\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("SmartPOS.Core.Entities.Product", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("int");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<decimal>("CostPrice")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("varchar(150)");
+                        .HasColumnType("character varying(150)");
 
-                    b.Property<int>("ReorderLevel")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("SellingPrice")
+                    b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<int>("StockQuantity")
-                        .HasColumnType("int");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
-
                     b.HasIndex("Name");
 
-                    b.HasIndex("Sku")
+                    b.HasIndex("ShopId", "Barcode")
+                        .IsUnique();
+
+                    b.HasIndex("ShopId", "Category");
+
+                    b.HasIndex("ShopId", "Sku")
                         .IsUnique();
 
                     b.ToTable("Products", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Products_CostPrice_NonNegative", "CostPrice >= 0");
+                            t.HasCheckConstraint("CK_Products_CostPrice_NonNegative", "\"CostPrice\" >= 0");
 
-                            t.HasCheckConstraint("CK_Products_ReorderLevel_NonNegative", "ReorderLevel >= 0");
-
-                            t.HasCheckConstraint("CK_Products_SellingPrice_NonNegative", "SellingPrice >= 0");
-
-                            t.HasCheckConstraint("CK_Products_StockQuantity_NonNegative", "StockQuantity >= 0");
+                            t.HasCheckConstraint("CK_Products_Price_NonNegative", "\"Price\" >= 0");
                         });
                 });
 
@@ -116,62 +176,89 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    b.Property<int>("CashierId")
-                        .HasColumnType("int");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("BillNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("ChangeAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("DiscountPercent")
                         .HasPrecision(5, 2)
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<string>("InvoiceNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                        .HasColumnType("numeric(5,2)");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("Subtotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("TaxRatePercent")
                         .HasPrecision(5, 2)
-                        .HasColumnType("decimal(5,2)");
+                        .HasColumnType("numeric(5,2)");
 
-                    b.Property<decimal>("Total")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CashierId");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("InvoiceNumber")
+                    b.HasIndex("BillNumber")
                         .IsUnique();
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ShopId", "CreatedAt");
 
                     b.ToTable("Sales", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Sales_DiscountPercent_Range", "DiscountPercent >= 0 AND DiscountPercent <= 100");
+                            t.HasCheckConstraint("CK_Sales_AmountPaid_NonNegative", "\"AmountPaid\" >= 0");
 
-                            t.HasCheckConstraint("CK_Sales_Total_NonNegative", "Total >= 0");
+                            t.HasCheckConstraint("CK_Sales_ChangeAmount_NonNegative", "\"ChangeAmount\" >= 0");
+
+                            t.HasCheckConstraint("CK_Sales_DiscountPercent_Range", "\"DiscountPercent\" >= 0 AND \"DiscountPercent\" <= 100");
+
+                            t.HasCheckConstraint("CK_Sales_TotalAmount_NonNegative", "\"TotalAmount\" >= 0");
                         });
                 });
 
@@ -179,38 +266,48 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("LineTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<int>("Quantity")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("SaleId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Sku")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("UnitCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
 
                     b.HasKey("Id");
 
@@ -220,49 +317,80 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("SaleItems", null, t =>
                         {
-                            t.HasCheckConstraint("CK_SaleItems_Quantity_Positive", "Quantity > 0");
+                            t.HasCheckConstraint("CK_SaleItems_LineTotal_NonNegative", "\"LineTotal\" >= 0");
 
-                            t.HasCheckConstraint("CK_SaleItems_UnitPrice_NonNegative", "UnitPrice >= 0");
+                            t.HasCheckConstraint("CK_SaleItems_Quantity_Positive", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_SaleItems_UnitPrice_NonNegative", "\"UnitPrice\" >= 0");
                         });
+                });
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Shop", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ShopName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Shops", (string)null);
                 });
 
             modelBuilder.Entity("SmartPOS.Core.Entities.StockMovement", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("QuantityAfter")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("QuantityChange")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(250)
-                        .HasColumnType("varchar(250)");
+                        .HasColumnType("character varying(250)");
 
                     b.Property<int?>("SaleId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int?>("UserId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("SaleId");
 
@@ -270,9 +398,11 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductId", "CreatedAt");
 
+                    b.HasIndex("ShopId", "CreatedAt");
+
                     b.ToTable("StockMovements", null, t =>
                         {
-                            t.HasCheckConstraint("CK_StockMovements_QuantityAfter_NonNegative", "QuantityAfter >= 0");
+                            t.HasCheckConstraint("CK_StockMovements_QuantityAfter_NonNegative", "\"QuantityAfter\" >= 0");
                         });
                 });
 
@@ -280,68 +410,113 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(254)
-                        .HasColumnType("varchar(254)");
+                        .HasColumnType("character varying(254)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                    b.Property<int>("ShopId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("ShopId")
+                        .IsUnique();
+
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Customer", b =>
+                {
+                    b.HasOne("SmartPOS.Core.Entities.Shop", "Shop")
+                        .WithMany("Customers")
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Shop");
+                });
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Inventory", b =>
+                {
+                    b.HasOne("SmartPOS.Core.Entities.Product", "Product")
+                        .WithOne("Inventory")
+                        .HasForeignKey("SmartPOS.Core.Entities.Inventory", "ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SmartPOS.Core.Entities.Shop", "Shop")
+                        .WithMany("Inventories")
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Shop");
                 });
 
             modelBuilder.Entity("SmartPOS.Core.Entities.Product", b =>
                 {
-                    b.HasOne("SmartPOS.Core.Entities.Category", "Category")
+                    b.HasOne("SmartPOS.Core.Entities.Shop", "Shop")
                         .WithMany("Products")
-                        .HasForeignKey("CategoryId")
+                        .HasForeignKey("ShopId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Category");
+                    b.Navigation("Shop");
                 });
 
             modelBuilder.Entity("SmartPOS.Core.Entities.Sale", b =>
                 {
-                    b.HasOne("SmartPOS.Core.Entities.User", "Cashier")
+                    b.HasOne("SmartPOS.Core.Entities.Customer", "Customer")
                         .WithMany()
-                        .HasForeignKey("CashierId")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SmartPOS.Core.Entities.Shop", "Shop")
+                        .WithMany("Sales")
+                        .HasForeignKey("ShopId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Cashier");
+                    b.HasOne("SmartPOS.Core.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Shop");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SmartPOS.Core.Entities.SaleItem", b =>
@@ -376,6 +551,12 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SaleId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SmartPOS.Core.Entities.Shop", "Shop")
+                        .WithMany()
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SmartPOS.Core.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -385,17 +566,43 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Sale");
 
+                    b.Navigation("Shop");
+
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("SmartPOS.Core.Entities.Category", b =>
+            modelBuilder.Entity("SmartPOS.Core.Entities.User", b =>
                 {
-                    b.Navigation("Products");
+                    b.HasOne("SmartPOS.Core.Entities.Shop", "Shop")
+                        .WithMany("Users")
+                        .HasForeignKey("ShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Shop");
+                });
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Product", b =>
+                {
+                    b.Navigation("Inventory");
                 });
 
             modelBuilder.Entity("SmartPOS.Core.Entities.Sale", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("SmartPOS.Core.Entities.Shop", b =>
+                {
+                    b.Navigation("Customers");
+
+                    b.Navigation("Inventories");
+
+                    b.Navigation("Products");
+
+                    b.Navigation("Sales");
+
+                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }

@@ -15,23 +15,26 @@
     <app-loading label="Loading invoice…" />
   } @else {
     @let s = sale()!;
-    <article class="card invoice" aria-label="Invoice">
+    <article class="card invoice" aria-label="Bill">
       <header class="invoice-header">
         <div>
           <h1>{{ settings.storeName() }}</h1>
+          @if (settings.settings()?.storeAddress) { <p class="muted">{{ settings.settings()!.storeAddress }}</p> }
           <p class="muted">Tax invoice</p>
         </div>
         <dl class="invoice-meta">
-          <div><dt>Invoice</dt><dd class="mono">{{ s.invoiceNumber }}</dd></div>
+          <div><dt>Bill</dt><dd class="mono">{{ s.billNumber }}</dd></div>
           <div><dt>Date</dt><dd>{{ s.createdAt | date: 'MMM d, y, h:mm a' }}</dd></div>
           <div><dt>Cashier</dt><dd>{{ s.cashierName }}</dd></div>
+          @if (s.customerName) { <div><dt>Customer</dt><dd>{{ s.customerName }}</dd></div> }
           <div><dt>Payment</dt><dd>{{ s.paymentMethod }}</dd></div>
+          <div><dt>Status</dt><dd>{{ s.status }}</dd></div>
         </dl>
       </header>
 
       <table class="table invoice-table">
         <thead>
-          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num">Amount</th></tr>
+          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num hide-sm">Discount</th><th scope="col" class="num hide-sm">Tax</th><th scope="col" class="num">Amount</th></tr>
         </thead>
         <tbody>
           @for (item of s.items; track item.id) {
@@ -39,6 +42,8 @@
               <td><div class="cell-title">{{ item.productName }}</div><div class="cell-sub mono">{{ item.sku }}</div></td>
               <td class="num">{{ item.quantity }}</td>
               <td class="num">{{ item.unitPrice | money }}</td>
+              <td class="num hide-sm">{{ item.discountAmount > 0 ? '−' + (item.discountAmount | money) : '—' }}</td>
+              <td class="num hide-sm">{{ item.taxAmount | money }}</td>
               <td class="num">{{ item.lineTotal | money }}</td>
             </tr>
           }
@@ -51,7 +56,11 @@
           <div><dt>Discount ({{ s.discountPercent }}%)</dt><dd>−{{ s.discountAmount | money }}</dd></div>
         }
         <div><dt>Tax ({{ s.taxRatePercent }}%)</dt><dd>{{ s.taxAmount | money }}</dd></div>
-        <div class="grand"><dt>Total</dt><dd>{{ s.total | money }}</dd></div>
+        <div class="grand"><dt>Total</dt><dd>{{ s.totalAmount | money }}</dd></div>
+        <div><dt>Paid ({{ s.paymentMethod }})</dt><dd>{{ s.amountPaid | money }}</dd></div>
+        @if (s.changeAmount > 0) {
+          <div><dt>Change</dt><dd>{{ s.changeAmount | money }}</dd></div>
+        }
       </dl>
 
       <footer class="invoice-footer muted">Thank you for shopping with us.</footer>

@@ -11,10 +11,14 @@ public sealed class ProductService(
     ICurrentUser currentUser,
     StoreCalendar calendar) : IProductService
 {
+    // Every product has exactly one inventory row (created together), so the null checks only
+    // keep the translated SQL a plain LEFT JOIN.
     private static readonly Expression<Func<Product, ProductDto>> ToDto = p => new ProductDto(
-        p.Id, p.Sku, p.Name, p.Description, p.CategoryId, p.Category.Name,
-        p.SellingPrice, p.CostPrice, p.StockQuantity, p.ReorderLevel,
-        p.StockQuantity <= p.ReorderLevel, p.IsActive, p.CreatedAt, p.UpdatedAt);
+        p.Id, p.Sku, p.Barcode, p.Name, p.Description, p.Category, p.Price, p.CostPrice,
+        p.Inventory != null ? p.Inventory.StockQuantity : 0,
+        p.Inventory != null ? p.Inventory.LowStockThreshold : 0,
+        p.Inventory != null && p.Inventory.StockQuantity <= p.Inventory.LowStockThreshold,
+        p.ExpiryDate, p.IsActive, p.CreatedAt, p.UpdatedAt);
 
     public static string NormalizeSku(string sku) => sku.Trim().ToUpperInvariant();
 
@@ -23,14 +27,18 @@ public sealed class ProductService(
         var products = db.Products.AsNoTracking();
         if (!query.IncludeInactive)
             products = products.Where(p => p.IsActive);
-        if (query.CategoryId is { } categoryId)
-            products = products.Where(p => p.CategoryId == categoryId);
+        if (!string.IsNullOrWhiteSpace(query.Category))
+        {
+            var category = query.Category.Trim();
+            products = products.Where(p => p.Category == category);
+        }
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = SearchPattern.Contains(query.Search);
             products = products.Where(p =>
-                EF.Functions.Like(p.Name, pattern, SearchPattern.EscapeCharacter) ||
-                EF.Functions.Like(p.Sku, pattern, SearchPattern.EscapeCharacter));
+                EF.Functions.Like(p.Name.ToLower(), pattern, SearchPattern.EscapeCharacter) ||
+                EF.Functions.Like(p.Sku.ToLower(), pattern, SearchPattern.EscapeCharacter) ||
+                (p.Barcode != null && EF.Functions.Like(p.Barcode.ToLower(), pattern, SearchPattern.EscapeCharacter)));
         }
 
         return await products
@@ -46,23 +54,32 @@ public sealed class ProductService(
     public async Task<ProductDto> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken)
     {
         var sku = NormalizeSku(request.Sku);
-        await EnsureCategoryExists(request.CategoryId, cancellationToken);
+        var barcode = Clean(request.Barcode);
         await EnsureSkuIsFree(sku, excludeProductId: null, cancellationToken);
+        await EnsureBarcodeIsFree(barcode, excludeProductId: null, cancellationToken);
 
         var now = calendar.UtcNow;
         var product = new Product
         {
+            ShopId = currentUser.ShopId,
             Sku = sku,
+            Barcode = barcode,
             Name = request.Name.Trim(),
             Description = Clean(request.Description),
-            CategoryId = request.CategoryId,
-            SellingPrice = request.SellingPrice,
+            Category = request.Category.Trim(),
+            Price = request.Price,
             CostPrice = request.CostPrice,
-            StockQuantity = request.InitialStock,
-            ReorderLevel = request.ReorderLevel,
+            ExpiryDate = request.ExpiryDate,
             IsActive = true,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Inventory = new SmartPOS.Core.Entities.Inventory
+            {
+                ShopId = currentUser.ShopId,
+                StockQuantity = request.InitialStock,
+                LowStockThreshold = request.LowStockThreshold,
+                LastUpdated = now
+            }
         };
         db.Products.Add(product);
 
@@ -70,6 +87,7 @@ public sealed class ProductService(
         {
             db.StockMovements.Add(new StockMovement
             {
+                ShopId = currentUser.ShopId,
                 Product = product,
                 QuantityChange = request.InitialStock,
                 QuantityAfter = request.InitialStock,
@@ -80,31 +98,40 @@ public sealed class ProductService(
             });
         }
 
-        // One SaveChanges = one implicit transaction: the product and its opening movement go in together.
+        // One SaveChanges = one implicit transaction: the product, its inventory row and its
+        // opening movement go in together.
         await db.SaveChangesAsync(cancellationToken);
         return await GetAsync(product.Id, cancellationToken);
     }
 
     public async Task<ProductDto> UpdateAsync(int id, UpdateProductRequest request, CancellationToken cancellationToken)
     {
-        var product = await db.Products.SingleOrDefaultAsync(p => p.Id == id, cancellationToken)
+        var product = await db.Products.Include(p => p.Inventory).SingleOrDefaultAsync(p => p.Id == id, cancellationToken)
                       ?? throw NotFoundException.For("Product", id);
 
         var sku = NormalizeSku(request.Sku);
-        if (request.CategoryId != product.CategoryId)
-            await EnsureCategoryExists(request.CategoryId, cancellationToken);
+        var barcode = Clean(request.Barcode);
         if (sku != product.Sku)
             await EnsureSkuIsFree(sku, product.Id, cancellationToken);
+        if (barcode != product.Barcode)
+            await EnsureBarcodeIsFree(barcode, product.Id, cancellationToken);
 
+        var now = calendar.UtcNow;
         product.Sku = sku;
+        product.Barcode = barcode;
         product.Name = request.Name.Trim();
         product.Description = Clean(request.Description);
-        product.CategoryId = request.CategoryId;
-        product.SellingPrice = request.SellingPrice;
+        product.Category = request.Category.Trim();
+        product.Price = request.Price;
         product.CostPrice = request.CostPrice;
-        product.ReorderLevel = request.ReorderLevel;
+        product.ExpiryDate = request.ExpiryDate;
         product.IsActive = request.IsActive;
-        product.UpdatedAt = calendar.UtcNow;
+        product.UpdatedAt = now;
+        if (product.Inventory is { } inventory && inventory.LowStockThreshold != request.LowStockThreshold)
+        {
+            inventory.LowStockThreshold = request.LowStockThreshold;
+            inventory.LastUpdated = now;
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         return await GetAsync(product.Id, cancellationToken);
@@ -118,22 +145,22 @@ public sealed class ProductService(
         if (await db.SaleItems.AnyAsync(i => i.ProductId == id, cancellationToken))
             throw new ConflictException("This product appears on past sales and cannot be deleted. Deactivate it instead.");
 
-        // Its stock movements are removed by the database's ON DELETE CASCADE.
+        // Its inventory row and stock movements are removed by the database's ON DELETE CASCADE.
         db.Products.Remove(product);
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task EnsureCategoryExists(int categoryId, CancellationToken cancellationToken)
-    {
-        if (!await db.Categories.AnyAsync(c => c.Id == categoryId, cancellationToken))
-            throw new BusinessRuleException($"Category {categoryId} does not exist.");
-    }
-
     private async Task EnsureSkuIsFree(string sku, int? excludeProductId, CancellationToken cancellationToken)
     {
-        // Friendly pre-check; the unique index on Sku is the real guarantee.
+        // Friendly pre-check; the unique index on (ShopId, Sku) is the real guarantee.
         if (await db.Products.AnyAsync(p => p.Sku == sku && p.Id != excludeProductId, cancellationToken))
             throw new ConflictException($"A product with SKU '{sku}' already exists.");
+    }
+
+    private async Task EnsureBarcodeIsFree(string? barcode, int? excludeProductId, CancellationToken cancellationToken)
+    {
+        if (barcode is not null && await db.Products.AnyAsync(p => p.Barcode == barcode && p.Id != excludeProductId, cancellationToken))
+            throw new ConflictException($"A product with barcode '{barcode}' already exists.");
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

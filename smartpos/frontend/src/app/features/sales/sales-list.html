@@ -2,7 +2,7 @@
   <div class="page-header">
     <div>
       <h1>Sales</h1>
-      <p>{{ auth.isAdmin() ? 'All transactions' : 'Your transactions' }}</p>
+      <p>Bills created in your shop</p>
     </div>
     <div class="page-actions">
       <a routerLink="/pos" class="btn btn-primary">New sale</a>
@@ -20,8 +20,8 @@
         <input id="sales-to" type="date" class="input" formControlName="to">
       </div>
       <div class="field grow">
-        <label for="sales-search">Invoice number</label>
-        <input id="sales-search" type="search" class="input mono" formControlName="search" placeholder="INV-…">
+        <label for="sales-search">Bill number</label>
+        <input id="sales-search" type="search" class="input mono" formControlName="search" placeholder="BILL-…">
       </div>
       <button type="submit" class="btn btn-primary">Apply</button>
       <button type="button" class="btn btn-secondary" (click)="preset(1)">Today</button>
@@ -44,9 +44,10 @@
           <table class="table">
             <thead>
               <tr>
-                <th scope="col">Invoice</th>
+                <th scope="col">Bill</th>
                 <th scope="col">Date</th>
                 <th scope="col" class="hide-sm">Cashier</th>
+                <th scope="col" class="hide-sm">Customer</th>
                 <th scope="col" class="num hide-sm">Items</th>
                 <th scope="col" class="hide-sm">Payment</th>
                 <th scope="col" class="num">Total</th>
@@ -55,12 +56,13 @@
             <tbody>
               @for (s of r.items; track s.id) {
                 <tr>
-                  <td><a [routerLink]="['/sales', s.id]" class="mono">{{ s.invoiceNumber }}</a></td>
+                  <td><a [routerLink]="['/sales', s.id]" class="mono">{{ s.billNumber }}</a></td>
                   <td class="nowrap">{{ s.createdAt | date: 'MMM d, y, h:mm a' }}</td>
                   <td class="hide-sm">{{ s.cashierName }}</td>
+                  <td class="hide-sm">{{ s.customerName ?? '—' }}</td>
                   <td class="num hide-sm">{{ s.itemCount }}</td>
                   <td class="hide-sm">{{ s.paymentMethod }}</td>
-                  <td class="num">{{ s.total | money }}</td>
+                  <td class="num">{{ s.totalAmount | money }}</td>
                 </tr>
               }
             </tbody>

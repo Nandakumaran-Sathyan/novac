@@ -12,7 +12,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.FullName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.Email).HasMaxLength(254).IsRequired();
         builder.Property(u => u.PasswordHash).HasMaxLength(500).IsRequired();
-        builder.Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(u => u.Email).IsUnique();
+        // One user per shop: the shop's owner.
+        builder.HasIndex(u => u.ShopId).IsUnique();
+
+        builder.HasOne(u => u.Shop)
+            .WithMany(s => s.Users)
+            .HasForeignKey(u => u.ShopId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

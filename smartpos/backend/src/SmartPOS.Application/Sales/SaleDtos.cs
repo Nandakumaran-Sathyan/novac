@@ -28,6 +28,18 @@ public sealed class CreateSaleRequest
 
     [EnumDataType(typeof(PaymentMethod))]
     public PaymentMethod PaymentMethod { get; init; } = PaymentMethod.Cash;
+
+    /// <summary>
+    /// Amount received. Optional: omitted means "exactly the total". Cash may exceed the total (the
+    /// difference is returned as change); other methods must match it.
+    /// </summary>
+    [Range(typeof(decimal), "0", "9999999999.99", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
+    [MaxDecimalPlaces(2)]
+    public decimal? AmountPaid { get; init; }
+
+    /// <summary>Optional customer for the bill; must belong to the same shop.</summary>
+    [Range(1, int.MaxValue)]
+    public int? CustomerId { get; init; }
 }
 
 public sealed record SaleItemDto(
@@ -35,33 +47,42 @@ public sealed record SaleItemDto(
     int ProductId,
     string Sku,
     string ProductName,
-    decimal UnitPrice,
     int Quantity,
+    decimal UnitPrice,
+    decimal DiscountAmount,
+    decimal TaxAmount,
     decimal LineTotal);
 
 public sealed record SaleDto(
     int Id,
-    string InvoiceNumber,
+    string BillNumber,
     DateTime CreatedAt,
-    int CashierId,
+    int UserId,
     string CashierName,
+    int? CustomerId,
+    string? CustomerName,
+    SaleStatus Status,
     PaymentMethod PaymentMethod,
     decimal Subtotal,
     decimal DiscountPercent,
     decimal DiscountAmount,
     decimal TaxRatePercent,
     decimal TaxAmount,
-    decimal Total,
+    decimal TotalAmount,
+    decimal AmountPaid,
+    decimal ChangeAmount,
     IReadOnlyList<SaleItemDto> Items);
 
 public sealed record SaleSummaryDto(
     int Id,
-    string InvoiceNumber,
+    string BillNumber,
     DateTime CreatedAt,
     string CashierName,
+    string? CustomerName,
     int ItemCount,
+    SaleStatus Status,
     PaymentMethod PaymentMethod,
-    decimal Total);
+    decimal TotalAmount);
 
 public sealed class SaleQuery : PagedQuery
 {
@@ -70,17 +91,15 @@ public sealed class SaleQuery : PagedQuery
     /// <summary>Store-local calendar date, inclusive.</summary>
     public DateOnly? To { get; init; }
 
-    /// <summary>Matches part of the invoice number.</summary>
+    /// <summary>Matches part of the bill number.</summary>
     [StringLength(50)]
     public string? Search { get; init; }
-
-    /// <summary>Admins only; cashiers always see just their own sales.</summary>
-    public int? CashierId { get; init; }
 }
 
 /// <summary>Configuration the POS screen needs to preview totals and enforce limits.</summary>
 public sealed record PosSettingsDto(
     string StoreName,
+    string StoreAddress,
     string CurrencyCode,
     string TimeZoneId,
     decimal TaxRatePercent,

@@ -8,12 +8,12 @@ public sealed record InventoryItemDto(
     int ProductId,
     string Sku,
     string Name,
-    string CategoryName,
+    string Category,
     int StockQuantity,
-    int ReorderLevel,
+    int LowStockThreshold,
     StockStatus Status,
     bool IsActive,
-    DateTime UpdatedAt);
+    DateTime LastUpdated);
 
 public sealed record StockMovementDto(
     int Id,
@@ -25,14 +25,14 @@ public sealed record StockMovementDto(
     StockMovementType Type,
     string Reason,
     int? SaleId,
-    string? InvoiceNumber,
+    string? BillNumber,
     string? UserName,
     DateTime CreatedAt);
 
 public enum InventoryFilter
 {
     All,
-    /// <summary>At or below reorder level, including out of stock.</summary>
+    /// <summary>At or below the low-stock threshold, including out of stock.</summary>
     Low,
     OutOfStock
 }
@@ -42,7 +42,9 @@ public sealed class InventoryQuery : PagedQuery
     [StringLength(100)]
     public string? Search { get; init; }
 
-    public int? CategoryId { get; init; }
+    /// <summary>Exact category name.</summary>
+    [StringLength(100)]
+    public string? Category { get; init; }
 
     public InventoryFilter Filter { get; init; } = InventoryFilter.All;
 

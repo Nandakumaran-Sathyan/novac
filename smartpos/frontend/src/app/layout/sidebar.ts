@@ -1,24 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { UserRole } from '../core/models';
 import { Icon, IconName } from '../shared/components/icon';
 
 interface NavItem {
   label: string;
   path: string;
   icon: IconName;
-  roles: UserRole[];
 }
 
 const NAV: NavItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: 'dashboard', roles: ['Admin', 'Cashier'] },
-  { label: 'Point of Sale', path: '/pos', icon: 'cart', roles: ['Admin', 'Cashier'] },
-  { label: 'Sales', path: '/sales', icon: 'receipt', roles: ['Admin', 'Cashier'] },
-  { label: 'Products', path: '/products', icon: 'package', roles: ['Admin', 'Cashier'] },
-  { label: 'Inventory', path: '/inventory', icon: 'layers', roles: ['Admin', 'Cashier'] },
-  { label: 'Reports', path: '/reports', icon: 'chart', roles: ['Admin'] },
-  { label: 'Users', path: '/users', icon: 'users', roles: ['Admin'] },
+  { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
+  { label: 'Point of Sale', path: '/pos', icon: 'cart' },
+  { label: 'Sales', path: '/sales', icon: 'receipt' },
+  { label: 'Customers', path: '/customers', icon: 'user' },
+  { label: 'Products', path: '/products', icon: 'package' },
+  { label: 'Inventory', path: '/inventory', icon: 'layers' },
+  { label: 'Reports', path: '/reports', icon: 'chart' },
 ];
 
 @Component({
@@ -43,7 +41,7 @@ const NAV: NavItem[] = [
       </ul>
     </nav>
     <div class="sidebar-footer">
-      <span class="role-label">Signed in as {{ auth.user()?.role }}</span>
+      <span class="role-label">{{ auth.user()?.email }}</span>
     </div>
   `,
   styles: `
@@ -66,7 +64,6 @@ export class Sidebar {
   readonly navigate = output<void>();
 
   protected readonly items = computed(() => {
-    const role = this.auth.user()?.role;
-    return NAV.filter((item) => role !== undefined && item.roles.includes(role));
+    return this.auth.isAuthenticated() ? NAV : [];
   });
 }

@@ -3,7 +3,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { LoginResponse, User, UserRole } from '../models';
+import { LoginResponse, RegisterRequest, User } from '../models';
 
 const STORAGE_KEY = 'smartpos.session';
 
@@ -15,7 +15,7 @@ interface Session {
 
 /**
  * Holds the signed-in session. The JWT is kept in localStorage so a page refresh doesn't sign the
- * cashier out mid-shift; the trade-off (readable by any script on the page, so XSS matters) is
+ * user out mid-shift; the trade-off (readable by any script on the page, so XSS matters) is
  * discussed in docs/ARCHITECTURE.md. The server re-checks the user on every request.
  */
 @Injectable({ providedIn: 'root' })
@@ -27,7 +27,6 @@ export class AuthService {
 
   readonly user = computed(() => this.session()?.user ?? null);
   readonly isAuthenticated = computed(() => this.session() !== null);
-  readonly isAdmin = computed(() => this.user()?.role === 'Admin');
 
   constructor() {
     this.scheduleExpiry();
@@ -37,14 +36,16 @@ export class AuthService {
     return this.session()?.accessToken ?? null;
   }
 
-  hasRole(...roles: UserRole[]): boolean {
-    const role = this.user()?.role;
-    return role !== undefined && roles.includes(role);
-  }
-
   login(email: string, password: string): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${environment.apiUrl}/auth/login`, { email, password })
+      .pipe(tap((response) => this.setSession(response)));
+  }
+
+  /** Creates an account together with its shop and signs in. */
+  register(request: RegisterRequest): Observable<LoginResponse> {
+    return this.http
+      .post<LoginResponse>(`${environment.apiUrl}/auth/register`, request)
       .pipe(tap((response) => this.setSession(response)));
   }
 

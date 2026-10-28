@@ -11,7 +11,6 @@ using Microsoft.OpenApi;
 using SmartPOS.API.Auth;
 using SmartPOS.Application.Auth;
 using SmartPOS.Application.Common;
-using SmartPOS.Core.Enums;
 
 namespace SmartPOS.API.Infrastructure;
 
@@ -28,6 +27,7 @@ public static class ApiServiceCollectionExtensions
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<ICurrentShop, CurrentShop>();
 
         services.AddJwtAuthentication();
         services.AddSwagger();
@@ -79,27 +79,29 @@ public static class ApiServiceCollectionExtensions
                     IssuerSigningKey = JwtTokenService.CreateKey(jwt.SigningKey),
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromSeconds(30),
-                    NameClaimType = SmartPosClaims.Name,
-                    RoleClaimType = SmartPosClaims.Role
+                    NameClaimType = SmartPosClaims.Name
                 };
                 bearer.Events = new JwtBearerEvents
                 {
                     // A valid signature isn't enough: reject tokens for users who have since been
-                    // deactivated or had their role changed, so those changes take effect immediately.
+                    // deleted or moved to another shop.
                     OnTokenValidated = async context =>
                     {
                         var principal = context.Principal!;
                         if (!int.TryParse(principal.FindFirst(SmartPosClaims.UserId)?.Value, out var userId) ||
-                            !Enum.TryParse<UserRole>(principal.FindFirst(SmartPosClaims.Role)?.Value, out var role))
+                            !int.TryParse(principal.FindFirst(SmartPosClaims.ShopId)?.Value, out var shopId))
                         {
                             context.Fail("Malformed token.");
                             return;
                         }
                         var db = context.HttpContext.RequestServices.GetRequiredService<IApplicationDbContext>();
-                        var stillValid = await db.Users.AsNoTracking()
-                            .AnyAsync(u => u.Id == userId && u.IsActive && u.Role == role, context.HttpContext.RequestAborted);
+                        // The request has no authenticated user yet, so the shop query filter would match
+                        // nothing: switch it off and check the shop claim explicitly instead.
+                        var stillValid = await db.Users.IgnoreQueryFilters().AsNoTracking()
+                            .AnyAsync(u => u.Id == userId && u.ShopId == shopId,
+                                context.HttpContext.RequestAborted);
                         if (!stillValid)
-                            context.Fail("User is inactive or their role has changed.");
+                            context.Fail("User no longer exists.");
                     }
                 };
             });

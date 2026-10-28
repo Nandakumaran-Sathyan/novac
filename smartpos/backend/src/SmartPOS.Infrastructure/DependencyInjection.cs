@@ -23,13 +23,14 @@ public static class DependencyInjection
                 throw new InvalidOperationException(
                     $"ConnectionStrings:{ConnectionStringName} is not configured. Set it with `dotnet user-secrets` " +
                     $"or the ConnectionStrings__{ConnectionStringName} environment variable (see docs/DATABASE.md).");
-            options.UseMySQL(connectionString);
+            options.UseNpgsql(connectionString);
         });
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<SmartPosDbContext>());
 
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
-        services.Configure<BootstrapAdminOptions>(configuration.GetSection(BootstrapAdminOptions.SectionName));
-        services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<ISampleDataSeeder, SampleDataSeeder>();
+        services.AddScoped<DemoHistoryCommand>();
+        services.AddScoped<ResetPasswordCommand>();
 
         services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
         return services;
