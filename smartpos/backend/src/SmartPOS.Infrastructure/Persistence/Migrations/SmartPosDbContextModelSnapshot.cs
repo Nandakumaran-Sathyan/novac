@@ -207,6 +207,9 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
 
+                    b.Property<int>("LoyaltyPointsEarned")
+                        .HasColumnType("integer");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -257,6 +260,8 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Sales_ChangeAmount_NonNegative", "\"ChangeAmount\" >= 0");
 
                             t.HasCheckConstraint("CK_Sales_DiscountPercent_Range", "\"DiscountPercent\" >= 0 AND \"DiscountPercent\" <= 100");
+
+                            t.HasCheckConstraint("CK_Sales_LoyaltyPointsEarned_NonNegative", "\"LoyaltyPointsEarned\" >= 0");
 
                             t.HasCheckConstraint("CK_Sales_TotalAmount_NonNegative", "\"TotalAmount\" >= 0");
                         });
@@ -421,6 +426,16 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
+
+                    b.Property<DateTime?>("EmailVerificationExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailVerificationTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("FullName")
                         .IsRequired()

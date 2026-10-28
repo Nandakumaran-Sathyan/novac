@@ -34,6 +34,9 @@ public class Sale
     /// <summary>Change returned to the customer (cash only).</summary>
     public decimal ChangeAmount { get; set; }
 
+    /// <summary>Loyalty points this bill earned for its customer (0 for walk-ins). Kept so the balance can always be re-derived.</summary>
+    public int LoyaltyPointsEarned { get; set; }
+
     public SaleStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
 

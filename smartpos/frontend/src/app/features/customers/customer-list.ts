@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { SettingsService } from '../../core/api/settings.service';
 import { CustomersService } from '../../core/api/customers.service';
 import { errorMessage } from '../../core/http/http-utils';
 import { Customer, PagedResult } from '../../core/models';
@@ -24,6 +25,11 @@ const PHONE_PATTERN = /^\+?[0-9][0-9 ()-]{5,18}[0-9]$/;
 export class CustomerList implements OnInit {
   private readonly customers = inject(CustomersService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
+  protected readonly rateText = () => {
+    const rate = this.settings.settings()?.loyaltySpendPerPoint;
+    return rate ? `1 point for every ${rate} spent, rounded down` : 'points are switched off';
+  };
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(NonNullableFormBuilder);
 

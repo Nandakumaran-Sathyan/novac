@@ -49,6 +49,27 @@ export class AuthService {
       .pipe(tap((response) => this.setSession(response)));
   }
 
+  /** Confirms an email address with the token from the emailed link. */
+  verifyEmail(token: string): Observable<void> {
+    return this.http.post<void>(`${environment.apiUrl}/auth/verify-email`, { token });
+  }
+
+  resendVerification(): Observable<void> {
+    return this.http.post<void>(`${environment.apiUrl}/auth/resend-verification`, {});
+  }
+
+  /** Re-reads the signed-in user's profile (e.g. after verifying their email) and updates the stored session. */
+  refreshUser(): Observable<User> {
+    return this.http.get<User>(`${environment.apiUrl}/auth/me`).pipe(
+      tap((user) => {
+        const session = this.session();
+        if (session) {
+          this.setSession({ ...session, user });
+        }
+      }),
+    );
+  }
+
   logout(reason?: 'expired'): void {
     this.setSession(null);
     void this.router.navigate(['/login'], { queryParams: reason ? { reason } : {} });

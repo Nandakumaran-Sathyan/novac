@@ -41,9 +41,16 @@ public sealed record UserDto(
     int Id,
     string FullName,
     string Email,
+    bool EmailVerified,
     int ShopId,
     string ShopName,
     DateTime CreatedAt,
     DateTime? LastLoginAt);
+
+public sealed class VerifyEmailRequest
+{
+    [Required, StringLength(200, MinimumLength = 20)]
+    public string Token { get; init; } = string.Empty;
+}
 
 public sealed record LoginResponse(string AccessToken, DateTime ExpiresAt, UserDto User);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using SmartPOS.Application.Common;
+using SmartPOS.Application.Customers;
 using SmartPOS.Application.Sales;
 using SmartPOS.Core.Entities;
 using SmartPOS.Core.Enums;
@@ -49,7 +50,7 @@ internal static class DemoHistory
     public static Result Generate(
         int shopId, int userId, IReadOnlyDictionary<Product, int> targetStock,
         StoreCalendar calendar, DateTime nowUtc, decimal taxRatePercent, decimal maxDiscountPercent, int days,
-        IReadOnlySet<string>? existingPhones = null)
+        decimal loyaltySpendPerPoint = 100, IReadOnlySet<string>? existingPhones = null)
     {
         // Seeded per shop: reproducible for a given shop, but two shops never produce the same bill numbers
         // (BillNumber is unique across the whole database).
@@ -117,8 +118,11 @@ internal static class DemoHistory
                     Subtotal = totals.Subtotal, DiscountPercent = discount, DiscountAmount = totals.DiscountAmount,
                     TaxRatePercent = taxRatePercent, TaxAmount = totals.TaxAmount, TotalAmount = totals.Total,
                     PaymentMethod = method, AmountPaid = paid, ChangeAmount = paid - totals.Total,
+                    LoyaltyPointsEarned = customer is null ? 0 : LoyaltyRules.PointsEarned(totals.Total, loyaltySpendPerPoint),
                     Status = SaleStatus.Completed, CreatedAt = createdAt
                 };
+                if (customer is not null)
+                    customer.LoyaltyPoints += sale.LoyaltyPointsEarned; // the balance is exactly what the bills earned
                 for (var i = 0; i < chosen.Count; i++)
                 {
                     var (product, quantity) = chosen[i];

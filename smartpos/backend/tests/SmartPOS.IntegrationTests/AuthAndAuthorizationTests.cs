@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using SmartPOS.Application.Auth;
 
 namespace SmartPOS.IntegrationTests;
@@ -99,5 +100,104 @@ public class AuthAndAuthorizationTests(SmartPosApiFactory factory) : IClassFixtu
     {
         var user = await factory.UserClientAsync();
         Assert.Equal(HttpStatusCode.NotFound, (await user.GetAsync("/api/users")).StatusCode);
+    }
+
+    // ---- email validation and verification ------------------------------------------------------------
+
+    private static string TokenFrom((string To, string Subject, string Body) mail) =>
+        Regex.Match(mail.Body, @"token=(\S+)").Groups[1].Value;
+
+    private (string To, string Subject, string Body) LastMailTo(string email) =>
+        factory.Mail.Sent.Last(m => m.To == email);
+
+    [Fact]
+    public async Task Registering_sends_a_verification_link_and_the_account_starts_unverified()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("verify.me@test.local"));
+        var login = (await response.Content.ReadFromJsonAsync<LoginResponse>(SmartPosApiFactory.Json))!;
+        Assert.False(login.User.EmailVerified);
+
+        var mail = LastMailTo("verify.me@test.local");
+        Assert.StartsWith("https://pos.test/verify-email?token=" + login.User.Id + ".", mail.Body.Split('\n').First(l => l.StartsWith("https://")));
+    }
+
+    [Fact]
+    public async Task The_emailed_token_verifies_the_address_once_and_only_once()
+    {
+        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("once@test.local"));
+        var token = TokenFrom(LastMailTo("once@test.local"));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token })).StatusCode);
+        var client = await factory.CreateClientAsAsync("once@test.local", "Registered123");
+        Assert.True((await client.GetFromJsonAsync<UserDto>("/api/auth/me", SmartPosApiFactory.Json))!.EmailVerified);
+
+        // The same link cannot be used again.
+        Assert.Equal(HttpStatusCode.BadRequest, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token })).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("nonsense-token-that-is-long-enough")]
+    [InlineData("1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
+    [InlineData("999999.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
+    public async Task A_wrong_token_does_not_verify_anything(string token)
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_token_for_one_user_cannot_verify_another()
+    {
+        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("alice@test.local"));
+        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("bob@test.local"));
+        var alice = TokenFrom(LastMailTo("alice@test.local"));
+        var bobId = alice.Split('.')[0] == TokenFrom(LastMailTo("bob@test.local")).Split('.')[0] ? "x" : TokenFrom(LastMailTo("bob@test.local")).Split('.')[0];
+
+        // Bob's id with Alice's secret.
+        var forged = bobId + "." + alice.Split('.')[1];
+        Assert.Equal(HttpStatusCode.BadRequest, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token = forged })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Resending_replaces_the_old_link_and_stops_once_verified()
+    {
+        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("resend@test.local"));
+        var first = TokenFrom(LastMailTo("resend@test.local"));
+        var client = await factory.CreateClientAsAsync("resend@test.local", "Registered123");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/auth/resend-verification", null)).StatusCode);
+        var second = TokenFrom(LastMailTo("resend@test.local"));
+        Assert.NotEqual(first, second);
+        Assert.Equal(HttpStatusCode.BadRequest, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token = first })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token = second })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/auth/resend-verification", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Resending_needs_a_signed_in_user()
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().PostAsync("/api/auth/resend-verification", null)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("someone@mailinator.com", "temporary")]
+    [InlineData("someone@nomail.invalid", "doesn't appear to accept email")]
+    public async Task Disposable_and_undeliverable_addresses_are_refused(string email, string expectedMessage)
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop(email));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(expectedMessage, await response.Content.ReadAsStringAsync());
+
+        // ...and no account was created for it.
+        var login = await factory.CreateClient().PostAsJsonAsync("/api/auth/login", new { email, password = "Registered123" });
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_failed_domain_lookup_does_not_block_sign_up()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("owner@unknowable.test"));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 }

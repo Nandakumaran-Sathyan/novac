@@ -14,6 +14,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
             t.HasCheckConstraint("CK_Sales_DiscountPercent_Range", "\"DiscountPercent\" >= 0 AND \"DiscountPercent\" <= 100");
             t.HasCheckConstraint("CK_Sales_ChangeAmount_NonNegative", "\"ChangeAmount\" >= 0");
             t.HasCheckConstraint("CK_Sales_AmountPaid_NonNegative", "\"AmountPaid\" >= 0");
+            t.HasCheckConstraint("CK_Sales_LoyaltyPointsEarned_NonNegative", "\"LoyaltyPointsEarned\" >= 0");
         });
 
         builder.Property(s => s.BillNumber).HasMaxLength(50).IsRequired();

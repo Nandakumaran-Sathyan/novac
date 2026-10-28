@@ -16,6 +16,11 @@ public class User
     public string Email { get; set; } = string.Empty;
     /// <summary>ASP.NET Core Identity PBKDF2 hash. The plaintext password is never stored.</summary>
     public string PasswordHash { get; set; } = string.Empty;
+    /// <summary>When the user proved they own the email address by opening the link we sent. Null until then.</summary>
+    public DateTime? EmailVerifiedAt { get; set; }
+    /// <summary>SHA-256 (hex) of the pending verification token; the token itself is never stored.</summary>
+    public string? EmailVerificationTokenHash { get; set; }
+    public DateTime? EmailVerificationExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }

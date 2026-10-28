@@ -34,6 +34,7 @@ public sealed class SampleDataSeeder(
     SmartPosDbContext db,
     IOptions<DatabaseOptions> options,
     IOptions<PosOptions> posOptions,
+    IOptions<LoyaltyOptions> loyaltyOptions,
     StoreCalendar calendar,
     TimeProvider timeProvider) : ISampleDataSeeder
 {
@@ -77,7 +78,8 @@ public sealed class SampleDataSeeder(
                 .Select(u => u.Id).FirstAsync(cancellationToken);
             history = DemoHistory.Generate(
                 shopId, userId, created.ToDictionary(c => c.Product, c => c.Seed.Stock), calendar, now,
-                posOptions.Value.TaxRatePercent, posOptions.Value.MaxDiscountPercent, Math.Clamp(options.Value.DemoHistoryDays, 1, 365));
+                posOptions.Value.TaxRatePercent, posOptions.Value.MaxDiscountPercent, Math.Clamp(options.Value.DemoHistoryDays, 1, 365),
+                loyaltyOptions.Value.SpendPerPoint);
             db.Customers.AddRange(history.Customers);
             db.Sales.AddRange(history.Sales);
             db.StockMovements.AddRange(history.Movements);

@@ -110,3 +110,6 @@ kbd {
 .customer-matches button:hover, .customer-matches button:focus-visible { background: var(--color-surface-muted); }
 .complete-change { margin: 4px 0 0; }
 .customer-chip .mono { margin-left: 8px; }
+.points { font-size: 0.8125rem; font-weight: 600; color: var(--color-primary-text); }
+.points .muted { font-weight: 400; }
+.complete-points { margin: 4px 0 0; color: var(--color-primary-text); }

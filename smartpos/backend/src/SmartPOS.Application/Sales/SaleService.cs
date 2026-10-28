@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmartPOS.Application.Common;
+using SmartPOS.Application.Customers;
 using SmartPOS.Application.Inventory;
 using SmartPOS.Core.Entities;
 using SmartPOS.Core.Enums;
@@ -16,6 +17,7 @@ public sealed class SaleService(
     StoreCalendar calendar,
     IOptions<PosOptions> posOptions,
     IOptions<StoreOptions> storeOptions,
+    IOptions<LoyaltyOptions> loyaltyOptions,
     ILogger<SaleService> logger) : ISaleService
 {
     internal static readonly Expression<Func<Sale, SaleSummaryDto>> ToSummaryDto = s => new SaleSummaryDto(
@@ -77,6 +79,7 @@ public sealed class SaleService(
             PaymentMethod = request.PaymentMethod,
             AmountPaid = amountPaid,
             ChangeAmount = changeAmount,
+            LoyaltyPointsEarned = request.CustomerId is null ? 0 : LoyaltyRules.PointsEarned(totals.Total, loyaltyOptions.Value.SpendPerPoint),
             Status = SaleStatus.Completed,
             CreatedAt = now
         };
@@ -121,6 +124,13 @@ public sealed class SaleService(
 
         db.Sales.Add(sale);
         await db.SaveChangesAsync(cancellationToken);
+        if (sale.LoyaltyPointsEarned > 0)
+        {
+            // Add to the balance in the database (not read-modify-write) so two bills for one customer can't lose points.
+            var points = sale.LoyaltyPointsEarned;
+            await db.Customers.Where(c => c.Id == request.CustomerId)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.LoyaltyPoints, c => c.LoyaltyPoints + points), cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
 
         logger.LogInformation("Sale {BillNumber} created by user {UserId}: {ItemCount} lines, total {Total}",
@@ -161,7 +171,7 @@ public sealed class SaleService(
                        .Select(s => new SaleDto(
                            s.Id, s.BillNumber, s.CreatedAt, s.UserId, s.User.FullName,
                            s.CustomerId, s.Customer != null ? s.Customer.Name : null,
-                           s.Status, s.PaymentMethod,
+                           s.Status, s.PaymentMethod, s.LoyaltyPointsEarned, s.Customer != null ? s.Customer.LoyaltyPoints : null,
                            s.Subtotal, s.DiscountPercent, s.DiscountAmount, s.TaxRatePercent, s.TaxAmount,
                            s.TotalAmount, s.AmountPaid, s.ChangeAmount,
                            s.Items.OrderBy(i => i.Id)
@@ -183,7 +193,7 @@ public sealed class SaleService(
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw NotFoundException.For("Shop", currentUser.ShopId);
         return new PosSettingsDto(shop.ShopName, shop.Address, store.CurrencyCode, store.TimeZoneId, pos.TaxRatePercent,
-            DiscountPolicy.MaxDiscountPercent(pos));
+            DiscountPolicy.MaxDiscountPercent(pos), loyaltyOptions.Value.SpendPerPoint);
     }
 
     /// <summary>The shop's own sales (the DbContext's shop filter does the scoping).</summary>

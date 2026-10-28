@@ -18,6 +18,7 @@ public sealed class DemoHistoryCommand(
     SmartPosDbContext db,
     StoreCalendar calendar,
     IOptions<PosOptions> posOptions,
+    IOptions<LoyaltyOptions> loyaltyOptions,
     TimeProvider timeProvider)
 {
     public async Task<string> RunAsync(string email, int days, CancellationToken cancellationToken)
@@ -54,7 +55,8 @@ public sealed class DemoHistoryCommand(
         var existingPhones = (await db.Customers.IgnoreQueryFilters().Where(c => c.ShopId == shopId).Select(c => c.Phone)
             .ToListAsync(cancellationToken)).ToHashSet();
         var history = DemoHistory.Generate(shopId, user.Id, target, calendar, cutoff, posOptions.Value.TaxRatePercent,
-            posOptions.Value.MaxDiscountPercent, Math.Clamp(days, 1, 365), existingPhones);
+            posOptions.Value.MaxDiscountPercent, Math.Clamp(days, 1, 365),
+            loyaltyOptions.Value.SpendPerPoint, existingPhones);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         foreach (var product in products)

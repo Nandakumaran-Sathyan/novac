@@ -407,4 +407,60 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
         var user = await factory.UserClientAsync();
         Assert.Equal(HttpStatusCode.BadRequest, (await user.GetAsync($"/api/dashboard/insights?days={days}")).StatusCode);
     }
+
+    [Fact]
+    public async Task Loyalty_points_are_earned_per_bill_total_rounded_down_and_added_to_the_balance()
+    {
+        var user = await factory.UserClientAsync();
+        var product = await CreateProductAsync(user, "LOY-1", 100m, 50);
+        var cheap = await CreateProductAsync(user, "LOY-2", 90m, 50);
+        var customer = (await (await user.PostAsJsonAsync("/api/customers", new { name = "Points Buyer", phone = "9000000888" }))
+            .Content.ReadFromJsonAsync<Application.Customers.CustomerDto>(SmartPosApiFactory.Json))!;
+        Assert.Equal(0, customer.LoyaltyPoints);
+
+        // 3 × 100 + 5% tax = 315.00 → 3 points.
+        var bill = (await (await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = product.Id, quantity = 3 } }, customerId = customer.Id }))
+            .Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
+        Assert.Equal(315m, bill.TotalAmount);
+        Assert.Equal(3, bill.LoyaltyPointsEarned);
+        Assert.Equal(3, bill.CustomerLoyaltyPoints);
+
+        // 1 × 90 + 5% = 94.50 → a part-point is not awarded.
+        var small = (await (await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = cheap.Id, quantity = 1 } }, customerId = customer.Id }))
+            .Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
+        Assert.Equal(94.5m, small.TotalAmount);
+        Assert.Equal(0, small.LoyaltyPointsEarned);
+
+        // Another 3-point bill takes the balance to 6.
+        var third = (await (await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = product.Id, quantity = 3 } }, customerId = customer.Id }))
+            .Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
+        Assert.Equal(6, third.CustomerLoyaltyPoints);
+        Assert.Equal(6, (await user.GetFromJsonAsync<Application.Customers.CustomerDto>($"/api/customers/{customer.Id}", SmartPosApiFactory.Json))!.LoyaltyPoints);
+    }
+
+    [Fact]
+    public async Task Walk_in_bills_earn_nothing_and_a_failed_sale_awards_nothing()
+    {
+        var user = await factory.UserClientAsync();
+        var product = await CreateProductAsync(user, "LOY-3", 100m, 2);
+        var customer = (await (await user.PostAsJsonAsync("/api/customers", new { name = "Walk Past", phone = "9000000889" }))
+            .Content.ReadFromJsonAsync<Application.Customers.CustomerDto>(SmartPosApiFactory.Json))!;
+
+        var walkIn = (await (await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = product.Id, quantity = 1 } } }))
+            .Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
+        Assert.Equal(0, walkIn.LoyaltyPointsEarned);
+        Assert.Null(walkIn.CustomerLoyaltyPoints);
+
+        var oversell = await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = product.Id, quantity = 5 } }, customerId = customer.Id });
+        Assert.Equal(HttpStatusCode.Conflict, oversell.StatusCode);
+        Assert.Equal(0, (await user.GetFromJsonAsync<Application.Customers.CustomerDto>($"/api/customers/{customer.Id}", SmartPosApiFactory.Json))!.LoyaltyPoints);
+    }
+
+    [Fact]
+    public async Task Pos_settings_tell_the_till_the_earning_rate()
+    {
+        var user = await factory.UserClientAsync();
+        var settings = await user.GetFromJsonAsync<PosSettingsDto>("/api/settings/pos", SmartPosApiFactory.Json);
+        Assert.Equal(100m, settings!.LoyaltySpendPerPoint);
+    }
 }

@@ -45,6 +45,7 @@ atomic conditional stock update), so concurrency-sensitive SQL lives in one plac
 | Products with sales can't be deleted, only deactivated | Keeps history intact | Inactive products accumulate |
 | Store time zone in config, UTC in DB | Correct "today" for a shop regardless of server location | Daily report groups in memory |
 | JWT with user and shop claims + per-request user check | A deleted user or changed shop takes effect immediately | One indexed query per request |
+| Email checked at sign-up (free DNS lookup + disposable list) and confirmed by link; the check fails open | Typos and throwaway addresses are caught without paying for a verification API, and a DNS outage cannot lock anyone out | A lookup failure lets a bad domain through; verification does not yet gate any feature |
 | Self-registration, no seeded account | No known default password exists anywhere; anyone can open a shop | Public sign-up is rate limited but has no email verification |
 | `localStorage` for the token | Survives refresh mid-shift | Readable by injected script; mitigated by Angular's default escaping and no `innerHTML`; move to HTTP-only cookies for higher assurance |
 | PostgreSQL via Npgsql | Mature EF Core provider with native `date`, `timestamptz`, `numeric` and identity columns | Its `LIKE` is case-sensitive, so searches lower-case both sides |

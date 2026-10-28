@@ -59,6 +59,18 @@ public class DemoHistoryTests
     }
 
     [Fact]
+    public void Loyalty_points_follow_the_earning_rule_and_add_up_to_each_customers_balance()
+    {
+        var history = DemoHistory.Generate(1, 1, Catalogue(), Calendar(), Now, 5, 100, 60, loyaltySpendPerPoint: 100);
+
+        Assert.All(history.Sales, s =>
+            Assert.Equal(s.Customer is null ? 0 : (int)Math.Floor(s.TotalAmount / 100m), s.LoyaltyPointsEarned));
+        Assert.Contains(history.Sales, s => s.LoyaltyPointsEarned > 0);
+        foreach (var customer in history.Customers)
+            Assert.Equal(history.Sales.Where(s => s.Customer == customer).Sum(s => s.LoyaltyPointsEarned), customer.LoyaltyPoints);
+    }
+
+    [Fact]
     public void Two_shops_never_share_a_bill_number()
     {
         var first = DemoHistory.Generate(1, 1, Catalogue(), Calendar(), Now, 5, 100, 30);

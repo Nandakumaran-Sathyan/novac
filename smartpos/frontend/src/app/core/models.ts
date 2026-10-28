@@ -23,6 +23,7 @@ export interface User {
   id: number;
   fullName: string;
   email: string;
+  emailVerified: boolean;
   shopId: number;
   shopName: string;
   createdAt: string;
@@ -148,6 +149,10 @@ export interface Sale {
   customerName: string | null;
   status: SaleStatus;
   paymentMethod: PaymentMethod;
+  /** Points this bill earned for its customer (0 for walk-ins). */
+  loyaltyPointsEarned: number;
+  /** The customer's balance right now, or null for a walk-in. */
+  customerLoyaltyPoints: number | null;
   subtotal: number;
   discountPercent: number;
   discountAmount: number;
@@ -187,6 +192,8 @@ export interface PosSettings {
   timeZoneId: string;
   taxRatePercent: number;
   maxDiscountPercent: number;
+  /** Amount spent to earn one loyalty point. */
+  loyaltySpendPerPoint: number;
 }
 
 export interface DashboardSummary {

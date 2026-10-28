@@ -63,6 +63,8 @@ public sealed record SaleDto(
     string? CustomerName,
     SaleStatus Status,
     PaymentMethod PaymentMethod,
+    int LoyaltyPointsEarned,
+    int? CustomerLoyaltyPoints,
     decimal Subtotal,
     decimal DiscountPercent,
     decimal DiscountAmount,
@@ -103,4 +105,5 @@ public sealed record PosSettingsDto(
     string CurrencyCode,
     string TimeZoneId,
     decimal TaxRatePercent,
-    decimal MaxDiscountPercent);
+    decimal MaxDiscountPercent,
+    decimal LoyaltySpendPerPoint);

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SmartPOS.Application.Auth;
 using SmartPOS.Application.Common;
+using SmartPOS.Infrastructure.Email;
 using SmartPOS.Infrastructure.Persistence;
 using SmartPOS.Infrastructure.Security;
 
@@ -29,6 +30,17 @@ public static class DependencyInjection
 
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
         services.AddScoped<ISampleDataSeeder, SampleDataSeeder>();
+
+        // Email: real SMTP when Email:Smtp:Host is set; otherwise (development) log the message; otherwise do nothing.
+        services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
+        var smtpConfigured = !string.IsNullOrWhiteSpace(configuration[$"{SmtpOptions.SectionName}:Host"]);
+        if (smtpConfigured)
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        else if (configuration.GetValue<bool>("Email:LogMessages"))
+            services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        else
+            services.AddSingleton<IEmailSender, NullEmailSender>();
+        services.AddSingleton<IEmailAddressChecker, DnsOverHttpsEmailAddressChecker>();
         services.AddScoped<DemoHistoryCommand>();
         services.AddScoped<ResetPasswordCommand>();
 

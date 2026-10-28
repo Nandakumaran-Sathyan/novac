@@ -9,11 +9,36 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Collections.Concurrent;
 using SmartPOS.Application.Auth;
 using SmartPOS.Core.Entities;
 using SmartPOS.Infrastructure.Persistence;
 
 namespace SmartPOS.IntegrationTests;
+
+/// <summary>Collects emails instead of sending them, so tests can read the verification link.</summary>
+public sealed class FakeEmailSender : IEmailSender
+{
+    public ConcurrentQueue<(string To, string Subject, string Body)> Sent { get; } = new();
+
+    public Task SendAsync(string to, string subject, string body, CancellationToken cancellationToken)
+    {
+        Sent.Enqueue((to, subject, body));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>No network in tests: "nomail.invalid" cannot receive mail, "unknowable.test" simulates a failed lookup, everything else can.</summary>
+public sealed class FakeEmailAddressChecker : IEmailAddressChecker
+{
+    public Task<EmailDomainStatus> CheckDomainAsync(string domain, CancellationToken cancellationToken) =>
+        Task.FromResult(domain switch
+        {
+            "nomail.invalid" => EmailDomainStatus.CannotReceiveMail,
+            "unknowable.test" => EmailDomainStatus.Unknown,
+            _ => EmailDomainStatus.CanReceiveMail
+        });
+}
 
 /// <summary>
 /// Runs the real API pipeline (auth, validation, controllers, services, EF Core) in memory.
@@ -34,6 +59,8 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         Converters = { new JsonStringEnumConverter() }
     };
 
+    public FakeEmailSender Mail { get; } = new();
+
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
     public int ShopId { get; private set; }
@@ -46,12 +73,18 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("RateLimiting:LoginPermitsPerMinute", "1000");
         builder.UseSetting("Pos:TaxRatePercent", "5");
         builder.UseSetting("Pos:MaxDiscountPercent", "50");
+        builder.UseSetting("App:WebBaseUrl", "https://pos.test");
 
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<SmartPosDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<SmartPosDbContext>>();
             services.AddDbContext<SmartPosDbContext>(options => options.UseSqlite(_connection));
+            services.RemoveAll<IEmailSender>();
+            services.RemoveAll<IEmailAddressChecker>();
+            services.AddSingleton(Mail);
+            services.AddSingleton<IEmailSender>(Mail);
+            services.AddSingleton<IEmailAddressChecker, FakeEmailAddressChecker>();
         });
     }
 

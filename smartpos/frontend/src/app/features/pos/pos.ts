@@ -55,6 +55,12 @@ export class Pos implements OnInit {
   protected readonly completedSale = signal<Sale | null>(null);
 
   protected readonly taxRate = computed(() => this.settings.settings()?.taxRatePercent ?? 0);
+  protected readonly spendPerPoint = computed(() => this.settings.settings()?.loyaltySpendPerPoint ?? 0);
+  /** Same rule as the server (LoyaltyRules): floor(total / spend per point), customers only. */
+  protected readonly pointsToEarn = computed(() => {
+    const rate = this.spendPerPoint();
+    return this.customer() && rate > 0 ? Math.floor(this.totals().total / rate) : 0;
+  });
   protected readonly maxDiscount = computed(() => this.settings.settings()?.maxDiscountPercent ?? 0);
   protected readonly discountInvalid = computed(() => {
     const d = this.discountPercent();

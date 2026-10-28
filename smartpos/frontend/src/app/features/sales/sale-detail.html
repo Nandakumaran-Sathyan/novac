@@ -27,6 +27,7 @@
           <div><dt>Date</dt><dd>{{ s.createdAt | date: 'MMM d, y, h:mm a' }}</dd></div>
           <div><dt>Cashier</dt><dd>{{ s.cashierName }}</dd></div>
           @if (s.customerName) { <div><dt>Customer</dt><dd>{{ s.customerName }}</dd></div> }
+          @if (s.customerName) { <div><dt>Loyalty</dt><dd>+{{ s.loyaltyPointsEarned }} pts (balance {{ s.customerLoyaltyPoints }})</dd></div> }
           <div><dt>Payment</dt><dd>{{ s.paymentMethod }}</dd></div>
           <div><dt>Status</dt><dd>{{ s.status }}</dd></div>
         </dl>

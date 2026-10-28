@@ -36,6 +36,29 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return StatusCode(StatusCodes.Status201Created, response);
     }
 
+    /// <summary>Confirm an email address with the token from the emailed link. Public: the link is opened from a mail client.</summary>
+    [HttpPost("verify-email")]
+    [AllowAnonymous]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.LoginRateLimitPolicy)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> VerifyEmail(VerifyEmailRequest request, CancellationToken cancellationToken)
+    {
+        await authService.VerifyEmailAsync(request, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Email the signed-in user a new verification link.</summary>
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.LoginRateLimitPolicy)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResendVerification(CancellationToken cancellationToken)
+    {
+        await authService.ResendVerificationAsync(cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>The signed-in user's profile. Used by the web app to confirm a stored session.</summary>
     [HttpGet("me")]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]

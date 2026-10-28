@@ -102,11 +102,11 @@ Every table except `Shops` carries a `ShopId`; see [Multi-shop isolation](#multi
 | Table | Purpose | Key rules |
 |---|---|---|
 | `Shops` | A store (tenant) | `ShopName`, `Address` |
-| `Users` | The login. Exactly one per shop: the shop's owner | FK → Shops (unique, so 1:1); `Email` unique across **all** shops (it is the login name, stored lower-case); `PasswordHash` (PBKDF2); no role column |
-| `Customers` | People the shop sells to | Unique `(ShopId, Phone)`; `LoyaltyPoints` (CHECK ≥ 0; not earned or spent by any rule yet) |
+| `Users` | The login. Exactly one per shop: the shop's owner | FK → Shops (unique, so 1:1); `Email` unique across **all** shops (it is the login name, stored lower-case); `PasswordHash` (PBKDF2); `EmailVerifiedAt` (null until confirmed) and, while a link is pending, the SHA-256 hash of its secret plus an expiry (never the secret itself); no role column |
+| `Customers` | People the shop sells to | Unique `(ShopId, Phone)`; `LoyaltyPoints` (CHECK ≥ 0; the sum of the points its bills earned, see the README for the rule) |
 | `Products` | Catalogue | Unique `(ShopId, Sku)` and `(ShopId, Barcode)`; `Category` is plain text; `Price`/`CostPrice` `numeric(18,2)`, CHECK ≥ 0; optional `ExpiryDate` (`date`) |
 | `Inventories` | Stock on hand, one row per product | Unique `ProductId` (cascade delete); `StockQuantity` (CHECK ≥ 0), `LowStockThreshold` (default 20), `LastUpdated` |
-| `Sales` | One bill per checkout | Unique `BillNumber`; `UserId` (who made the bill), optional `CustomerId`; `Subtotal`, `DiscountPercent`, `DiscountAmount`, **tax rate used**, `TaxAmount`, `TotalAmount`, `PaymentMethod` (Cash/Card/UPI/Other), `AmountPaid`, `ChangeAmount`, `Status` (Pending/Completed/Cancelled); money columns `decimal(12,2)`; index `(ShopId, CreatedAt)` |
+| `Sales` | One bill per checkout | Unique `BillNumber`; `UserId` (who made the bill), optional `CustomerId`; `Subtotal`, `DiscountPercent`, `DiscountAmount`, **tax rate used**, `TaxAmount`, `TotalAmount`, `LoyaltyPointsEarned` (CHECK ≥ 0), `PaymentMethod` (Cash/Card/UPI/Other), `AmountPaid`, `ChangeAmount`, `Status` (Pending/Completed/Cancelled); money columns `decimal(12,2)`; index `(ShopId, CreatedAt)` |
 | `SaleItems` | Lines of a bill | **Snapshot** of product name, SKU, unit price and unit cost at sale time; per-line `DiscountAmount`, `TaxAmount` and `LineTotal` (the lines add up exactly to the bill); CHECK `Quantity > 0`; FK → Sales (CASCADE), → Products (RESTRICT) |
 | `StockMovements` | Append-only stock ledger | `QuantityChange`, `QuantityAfter`, `Type` (InitialStock/Sale/Adjustment), `Reason`; optional FK to the sale and user |
 

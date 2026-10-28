@@ -12,6 +12,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
+    path: 'verify-email',
+    title: 'Verify email',
+    loadComponent: () => import('./features/auth/verify-email').then((m) => m.VerifyEmail),
+  },
+  {
     path: 'register',
     title: 'Create account',
     canActivate: [guestGuard],

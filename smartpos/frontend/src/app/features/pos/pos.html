@@ -55,6 +55,10 @@
         <p class="mono">{{ sale.billNumber }}</p>
         <p class="complete-total">{{ sale.totalAmount | money }}</p>
         <p class="muted">Paid by {{ sale.paymentMethod }}@if (sale.customerName) { · {{ sale.customerName }} }</p>
+        @if (sale.customerName) {
+          <p class="complete-points"><strong>+{{ sale.loyaltyPointsEarned }} loyalty {{ sale.loyaltyPointsEarned === 1 ? 'point' : 'points' }}</strong>
+            <span class="muted"> · balance {{ sale.customerLoyaltyPoints }}</span></p>
+        }
         @if (sale.changeAmount > 0) {
           <p class="complete-change"><strong>Change due: {{ sale.changeAmount | money }}</strong> <span class="muted">(received {{ sale.amountPaid | money }})</span></p>
         }
@@ -101,7 +105,8 @@
           @if (customer(); as c) {
             <span class="field-label">Customer</span>
             <div class="customer-chip">
-              <span><strong>{{ c.name }}</strong> <span class="muted mono">{{ c.phone }}</span></span>
+              <span><strong>{{ c.name }}</strong> <span class="muted mono">{{ c.phone }}</span><br>
+                <span class="points">{{ c.loyaltyPoints }} points<span class="muted"> · earns {{ pointsToEarn() }} on this bill</span></span></span>
               <button type="button" class="btn btn-ghost btn-sm" (click)="customer.set(null)" [attr.aria-label]="'Remove customer ' + c.name">Remove</button>
             </div>
           } @else {

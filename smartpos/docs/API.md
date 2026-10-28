@@ -14,7 +14,9 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/auth/login` | Public. `{ email, password }` → `{ accessToken, expiresAt, user }`. Rate limited. |
-| POST | `/api/auth/register` | Public. `{ fullName, email, password, shopName, shopAddress? }` → 201 with the same body as login. Creates the user and the shop they own; 409 if the email is taken. Rate limited. |
+| POST | `/api/auth/verify-email` | Public. `{ token }` from the emailed link → 204; 400 if it is wrong, used, replaced or expired. |
+| POST | `/api/auth/resend-verification` | Emails the signed-in user a new link (replacing the old one); 400 if already verified. Rate limited. |
+| POST | `/api/auth/register` | Public. `{ fullName, email, password, shopName, shopAddress? }` → 201 with the same body as login. Creates the user and the shop they own and emails a verification link; 409 if the email is taken; 400 for a throwaway-mailbox domain or a domain that cannot receive mail. Rate limited. |
 | GET | `/api/auth/me` | Current user profile |
 | GET | `/api/dashboard/summary` | Today's totals, counts, recent sales, low-stock list |
 | GET | `/api/dashboard/insights` | `days` (1–180, default 30). Sales analytics for the last N store days: KPIs with the previous N days for comparison (revenue, bills, average bill, items sold, customers, gross profit), a daily series with the matching previous-period day, a weekday × hour bill-count heatmap, payment mix, net sales by category, top products and customers, and customer vs walk-in bills. Completed bills only; days, weekdays and hours are in the store time zone. 400 outside 1–180 |
@@ -77,6 +79,12 @@ Rounding: 2 decimals, half away from zero. The tax rate in effect is stored on e
 The discount and tax are then shared out across the lines in proportion to their value, to the
 cent (largest-remainder), so each `SaleItem` has its own `discountAmount`, `taxAmount` and
 `lineTotal` (= subtotal − discount + tax) and the lines always add up exactly to the bill.
+
+## Loyalty points
+
+A bill with a `customerId` earns `floor(totalAmount / Loyalty:SpendPerPoint)` points (default 100): ₹99.99 → 0, ₹100 → 1,
+₹456.75 → 4. The sale response carries `loyaltyPointsEarned` and `customerLoyaltyPoints` (the balance afterwards; null for a
+walk-in); `GET /api/settings/pos` returns `loyaltySpendPerPoint`. The balance is updated atomically in the sale's transaction.
 
 ## Payment
 

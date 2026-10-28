@@ -26,6 +26,29 @@ public sealed class StoreOptions
     public string TimeZoneId { get; set; } = "UTC";
 }
 
+/// <summary>Bound from the "Loyalty" configuration section.</summary>
+public sealed class LoyaltyOptions
+{
+    public const string SectionName = "Loyalty";
+
+    /// <summary>Amount a customer spends to earn one point (in the store currency). 100 means 1 point per 100 spent.</summary>
+    [Range(typeof(decimal), "1", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
+    public decimal SpendPerPoint { get; set; } = 100;
+}
+
+/// <summary>Bound from the "App" configuration section.</summary>
+public sealed class AppOptions
+{
+    public const string SectionName = "App";
+
+    /// <summary>Public address of the web app, used to build links in emails (e.g. https://pos.example.com). Empty disables emailed links.</summary>
+    public string WebBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>How long an email-verification link stays valid.</summary>
+    [Range(1, 24 * 14)]
+    public int EmailVerificationHours { get; set; } = 24;
+}
+
 /// <summary>Bound from the "Pos" configuration section.</summary>
 public sealed class PosOptions
 {
