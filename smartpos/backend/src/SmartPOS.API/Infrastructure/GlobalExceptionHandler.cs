@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SmartPOS.Application.AI;
 using SmartPOS.Application.Common;
 
 namespace SmartPOS.API.Infrastructure;
@@ -23,12 +24,16 @@ public sealed class GlobalExceptionHandler(
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message),
             NotFoundException => (StatusCodes.Status404NotFound, "Not found", exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message),
+            TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Too many requests", exception.Message),
+            AIUnavailableException => (StatusCodes.Status503ServiceUnavailable, "AI assistant unavailable", exception.Message),
             // Typically a unique index or FK violation that slipped past a pre-check because of a race.
             DbUpdateException => (StatusCodes.Status409Conflict, "Conflict", "The change conflicts with existing data. Reload and try again."),
             _ => (StatusCodes.Status500InternalServerError, "Server error", "An unexpected error occurred.")
         };
 
-        if (status >= 500)
+        if (exception is AIUnavailableException)
+            logger.LogWarning("AI unavailable for {Method} {Path}: {Message}", httpContext.Request.Method, httpContext.Request.Path, exception.Message);
+        else if (status >= 500)
             logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
         else if (exception is DbUpdateException)
             logger.LogWarning(exception, "Database update conflict for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);

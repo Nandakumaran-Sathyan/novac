@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Collections.Concurrent;
+using SmartPOS.Application.AI;
 using SmartPOS.Application.Auth;
 using SmartPOS.Core.Entities;
 using SmartPOS.Infrastructure.Persistence;
@@ -40,6 +41,48 @@ public sealed class FakeEmailAddressChecker : IEmailAddressChecker
         });
 }
 
+/// <summary>Stands in for Ollama so tests never depend on a model server. Tests script its replies.</summary>
+public sealed class FakeChatModelClient : IChatModelClient
+{
+    public ChatModelStatus Status { get; set; } = new(true, "fake-model", true, true, "test", null);
+    public Queue<ChatModelResponse> Replies { get; } = new();
+    public List<IReadOnlyList<ChatMessage>> Calls { get; } = [];
+
+    /// <summary>When set, the next call throws it (e.g. AIUnavailableException).</summary>
+    public Exception? ThrowNext { get; set; }
+
+    /// <summary>When set, calls wait for it to complete (to test concurrent requests).</summary>
+    public TaskCompletionSource? Hold { get; set; }
+
+    /// <summary>
+    /// When set, decides each reply from what the model is sent (the messages so far and the tools offered),
+    /// so a test can act like a model that reads real tool results, or one that invents figures.
+    /// </summary>
+    public Func<IReadOnlyList<ChatMessage>, IReadOnlyList<ToolDefinition>, ChatModelResponse>? Responder { get; set; }
+
+    public List<int> ToolsOffered { get; } = [];
+
+    public async Task<ChatModelResponse> CompleteAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition> tools, CancellationToken cancellationToken)
+    {
+        lock (Calls) { Calls.Add([.. messages]); ToolsOffered.Add(tools.Count); }
+        if (Responder is { } responder)
+            return responder(messages, tools);
+        if (Hold is { } hold)
+            await hold.Task.WaitAsync(cancellationToken);
+        if (ThrowNext is { } ex)
+        {
+            ThrowNext = null;
+            throw ex;
+        }
+        lock (Replies)
+            return Replies.Count > 0
+                ? Replies.Dequeue()
+                : new ChatModelResponse(new ChatMessage(ChatRole.Assistant, "ok"), false, new ChatModelUsage(1, 1, TimeSpan.Zero));
+    }
+
+    public Task<ChatModelStatus> GetStatusAsync(CancellationToken cancellationToken) => Task.FromResult(Status);
+}
+
 /// <summary>
 /// Runs the real API pipeline (auth, validation, controllers, services, EF Core) in memory.
 /// SQLite in-memory replaces MySQL so the tests need no database server; MySQL-specific behaviour
@@ -60,6 +103,7 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
     };
 
     public FakeEmailSender Mail { get; } = new();
+    public FakeChatModelClient Model { get; } = new();
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
@@ -71,6 +115,7 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseEnvironment("Testing");
         builder.UseSetting("Jwt:SigningKey", "integration-tests-only-signing-key-0123456789abcdef");
         builder.UseSetting("RateLimiting:LoginPermitsPerMinute", "1000");
+        builder.UseSetting("Assistant:RequestsPerMinute", "1000"); // one dedicated test lowers it
         builder.UseSetting("Pos:TaxRatePercent", "5");
         builder.UseSetting("Pos:MaxDiscountPercent", "50");
         builder.UseSetting("App:WebBaseUrl", "https://pos.test");
@@ -85,6 +130,9 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
             services.AddSingleton(Mail);
             services.AddSingleton<IEmailSender>(Mail);
             services.AddSingleton<IEmailAddressChecker, FakeEmailAddressChecker>();
+            services.RemoveAll<IChatModelClient>();
+            services.AddSingleton(Model);
+            services.AddSingleton<IChatModelClient>(Model);
         });
     }
 

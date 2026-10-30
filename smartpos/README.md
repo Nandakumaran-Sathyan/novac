@@ -242,4 +242,5 @@ dotnet run --project src/SmartPOS.API -- reset-password --email you@example.com
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): layers, request flow, key decisions and trade-offs
 - [docs/DATABASE.md](docs/DATABASE.md): PostgreSQL setup, migrations, schema and integrity rules
 - [docs/API.md](docs/API.md): endpoint reference, error format
+- [docs/AI.md](docs/AI.md): the local AI assistant (Ollama + qwen3.5:9b): setup, verified model behaviour, security rules, phase status
 - [docs/TESTING.md](docs/TESTING.md): test suites and manual verification

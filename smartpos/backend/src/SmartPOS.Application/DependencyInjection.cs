@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SmartPOS.Application.AI;
+using SmartPOS.Application.AI.Tools;
 using SmartPOS.Application.Auth;
 using SmartPOS.Application.Categories;
 using SmartPOS.Application.Common;
@@ -46,6 +48,15 @@ public static class DependencyInjection
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IInsightsService, InsightsService>();
+
+        services.AddOptions<AssistantOptions>()
+            .Bind(configuration.GetSection(AssistantOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<AIConcurrencyGate>();
+        services.AddScoped<IAIService, AIOrchestrationService>();
+        services.AddScoped<IStoreAITools, StoreAITools>();
+        services.AddScoped<StoreToolRegistry>();
         return services;
     }
 }

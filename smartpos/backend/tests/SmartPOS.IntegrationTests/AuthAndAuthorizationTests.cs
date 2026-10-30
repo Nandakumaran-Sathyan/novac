@@ -200,4 +200,34 @@ public class AuthAndAuthorizationTests(SmartPosApiFactory factory) : IClassFixtu
         var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("owner@unknowable.test"));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
+
+    // ---- AI (Phase 2: status only) ------------------------------------------------------------------------
+
+    [Fact]
+    public async Task AI_status_needs_a_signed_in_user()
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().GetAsync("/api/ai/status")).StatusCode);
+        var user = await factory.UserClientAsync();
+        var status = await user.GetFromJsonAsync<SmartPOS.Application.AI.ChatModelStatus>("/api/ai/status", SmartPosApiFactory.Json);
+        Assert.True(status!.Ready);
+    }
+
+    [Fact]
+    public async Task Health_stays_up_but_reports_the_AI_as_degraded_when_the_model_is_down()
+    {
+        var original = factory.Model.Status;
+        factory.Model.Status = new SmartPOS.Application.AI.ChatModelStatus(false, "fake-model", false, false, null, "Ollama is not running.");
+        try
+        {
+            var response = await factory.CreateClient().GetAsync("/health");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode); // selling still works
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Contains("\"status\":\"Degraded\"", body);
+            Assert.Contains("Ollama is not running.", body);
+        }
+        finally
+        {
+            factory.Model.Status = original;
+        }
+    }
 }

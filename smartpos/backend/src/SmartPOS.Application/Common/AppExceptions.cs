@@ -24,3 +24,6 @@ public sealed class NotFoundException(string message) : AppException(message)
 
 /// <summary>409: the request conflicts with current state (duplicate SKU, insufficient stock...).</summary>
 public sealed class ConflictException(string message) : AppException(message);
+
+/// <summary>429: the caller must wait (for example, their previous AI question is still being answered).</summary>
+public sealed class TooManyRequestsException(string message) : AppException(message);

@@ -18,6 +18,7 @@ public static class ApiServiceCollectionExtensions
 {
     public const string CorsPolicy = "SmartPosWeb";
     public const string LoginRateLimitPolicy = "login";
+    public const string AIRateLimitPolicy = "ai";
 
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
@@ -49,9 +50,22 @@ public static class ApiServiceCollectionExtensions
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0
                 }));
+            // AI questions are expensive (one local GPU): N per minute per signed-in user. The endpoint requires a
+            // token, so the user id is always present; the IP is only a fallback.
+            options.AddPolicy(AIRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirst(SmartPosClaims.UserId)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = configuration.GetValue("Assistant:RequestsPerMinute", 10),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
         });
 
-        services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("database")
+            // Degraded, not Unhealthy: selling works without the AI assistant.
+            .AddCheck<AIModelHealthCheck>("ai-model", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
         return services;
     }
 

@@ -30,10 +30,19 @@ public sealed record TopProductRow(
     decimal Cost,
     decimal GrossProfit);
 
+/// <summary>How the top-products report is ordered. Revenue is the default (and what the Reports page uses).</summary>
+public enum TopProductSort
+{
+    Revenue,
+    Units,
+    Profit
+}
+
 public interface IReportService
 {
     Task<DailySalesReport> GetDailySalesAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
-    Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(DateOnly? from, DateOnly? to, int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(DateOnly? from, DateOnly? to, int limit, CancellationToken cancellationToken,
+        TopProductSort sortBy = TopProductSort.Revenue);
 }
 
 public sealed class ReportService(IApplicationDbContext db, StoreCalendar calendar) : IReportService
@@ -67,7 +76,8 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
         return new DailySalesReport(start, end, days, sales.Count, total, average);
     }
 
-    public async Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(DateOnly? from, DateOnly? to, int limit, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(DateOnly? from, DateOnly? to, int limit, CancellationToken cancellationToken,
+        TopProductSort sortBy = TopProductSort.Revenue)
     {
         if (limit is < 1 or > 50)
             throw new BusinessRuleException("Limit must be between 1 and 50.");
@@ -89,8 +99,13 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
             .ToListAsync(cancellationToken);
 
         // Ordered in memory: one row per product sold in the range, so the set stays small.
-        return rows
-            .OrderByDescending(r => r.Revenue).ThenByDescending(r => r.QuantitySold)
+        var ordered = sortBy switch
+        {
+            TopProductSort.Units => rows.OrderByDescending(r => r.QuantitySold).ThenByDescending(r => r.Revenue),
+            TopProductSort.Profit => rows.OrderByDescending(r => r.Revenue - r.Cost).ThenByDescending(r => r.Revenue),
+            _ => rows.OrderByDescending(r => r.Revenue).ThenByDescending(r => r.QuantitySold)
+        };
+        return ordered
             .Take(limit)
             .Select(r => new TopProductRow(r.ProductId, r.Sku ?? string.Empty, r.ProductName ?? string.Empty, r.QuantitySold, r.Revenue, r.Cost, r.Revenue - r.Cost))
             .ToList();

@@ -39,6 +39,8 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 | GET | `/api/sales/{id}` | Sale with items (404 if it belongs to another shop) |
 | GET | `/api/reports/daily-sales` | `from`, `to` (default last 7 days, max 366) |
 | GET | `/api/reports/top-products` | `from`, `to`, `limit` (1–50, default 10) |
+| POST | `/api/ai/chat` | `{ message, history?: [{ role: "user"|"assistant", content }] }` → `{ reply, toolsUsed, truncated, durationMs }`. Message 1-1000 chars; up to 40 history turns of 4000 chars (only the newest 12 are used); roles `system`/`tool` are rejected. Rate limited per user (10/min); 429 if your previous question is still running; 503 if the AI model is unavailable. See docs/AI.md |
+| GET | `/api/ai/status` | Whether the AI assistant can answer: Ollama reachable, model installed, tool calling supported (see docs/AI.md) |
 | GET | `/health` | Public. `{ status, checks: [{ name, status }] }`; 503 when the DB is unreachable |
 
 ## Pagination
