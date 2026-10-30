@@ -300,3 +300,33 @@ export interface TopProductRow {
   cost: number;
   grossProfit: number;
 }
+
+/** One earlier turn sent back for context. The server accepts only these two roles. */
+export interface AIChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIChatRequest {
+  message: string;
+  history: AIChatTurn[];
+}
+
+export interface AIChatResponse {
+  reply: string;
+  /** Names of the read-only data tools the assistant ran, e.g. GetTodaySales. */
+  toolsUsed: string[];
+  /** The model hit its output limit, so the answer may be cut off. */
+  truncated: boolean;
+  durationMs: number;
+}
+
+export interface AIStatus {
+  reachable: boolean;
+  model: string;
+  modelInstalled: boolean;
+  supportsTools: boolean;
+  serverVersion: string | null;
+  problem: string | null;
+  ready: boolean;
+}

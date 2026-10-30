@@ -19,26 +19,6 @@ namespace SmartPOS.Infrastructure.Persistence;
 /// </summary>
 internal static class DemoHistory
 {
-    private static readonly (string Name, string Phone)[] CustomerSeeds =
-    [
-        ("Aarav Mehta", "9000000101"), ("Diya Kapoor", "9000000102"), ("Kabir Singh", "9000000103"),
-        ("Ananya Iyer", "9000000104"), ("Rohan Das", "9000000105"), ("Meera Nair", "9000000106"),
-        ("Vihaan Reddy", "9000000107"), ("Ishita Bose", "9000000108"), ("Arjun Pillai", "9000000109"),
-        ("Saanvi Joshi", "9000000110"), ("Reyansh Gupta", "9000000111"), ("Tara Menon", "9000000112"),
-        ("Kian Shah", "9000000113"), ("Navya Rao", "9000000114"), ("Dev Malhotra", "9000000115"),
-        ("Zoya Khan", "9000000116")
-    ];
-
-    // Relative busyness by weekday (Monday first) and by opening hour (8:00-21:59).
-    private static readonly double[] WeekdayFactor = [0.9, 0.85, 0.95, 1.0, 1.15, 1.4, 1.25];
-    private static readonly int[] HourWeight = [3, 5, 7, 9, 10, 8, 6, 5, 6, 9, 12, 12, 9, 4]; // hours 8..21
-    private const int FirstHour = 8;
-
-    private static readonly Dictionary<string, double> CategoryPopularity = new()
-    {
-        ["Beverages"] = 1.6, ["Snacks"] = 1.4, ["Dairy"] = 1.3, ["Bakery"] = 1.0, ["Household"] = 0.5, ["Personal Care"] = 0.6
-    };
-
     public sealed record Result(
         IReadOnlyList<Customer> Customers,
         IReadOnlyList<Sale> Sales,
@@ -50,16 +30,17 @@ internal static class DemoHistory
     public static Result Generate(
         int shopId, int userId, IReadOnlyDictionary<Product, int> targetStock,
         StoreCalendar calendar, DateTime nowUtc, decimal taxRatePercent, decimal maxDiscountPercent, int days,
-        decimal loyaltySpendPerPoint = 100, IReadOnlySet<string>? existingPhones = null)
+        decimal loyaltySpendPerPoint = 100, IReadOnlySet<string>? existingPhones = null, SampleData.DemoProfile? profile = null)
     {
+        profile ??= SampleData.Grocery;
         // Seeded per shop: reproducible for a given shop, but two shops never produce the same bill numbers
         // (BillNumber is unique across the whole database).
         var rng = new Random(20261028 + shopId);
         var products = targetStock.Keys.ToList();
         var productWeights = products.Select((p, i) =>
-            (CategoryPopularity.GetValueOrDefault(p.Category, 1.0) * (0.6 + 0.8 * new Random(i * 7919 + 13).NextDouble()))).ToArray();
+            (profile.CategoryPopularity.GetValueOrDefault(p.Category, 1.0) * (0.6 + 0.8 * new Random(i * 7919 + 13).NextDouble()))).ToArray();
 
-        var customers = CustomerSeeds.Where(c => existingPhones is null || !existingPhones.Contains(c.Phone)).Select(c => new Customer
+        var customers = profile.Customers.Where(c => existingPhones is null || !existingPhones.Contains(c.Phone)).Select(c => new Customer
         {
             ShopId = shopId, Name = c.Name, Phone = c.Phone, CreatedAt = nowUtc.AddDays(-days)
         }).ToList();
@@ -78,23 +59,23 @@ internal static class DemoHistory
             var growth = 1.0 + 0.3 * d / Math.Max(days - 1, 1);
             var weekday = ((int)date.DayOfWeek + 6) % 7;
             var spike = d == days * 4 / 9 ? 1.6 : 1.0; // one festival-style rush
-            var billCount = (int)Math.Round(26 * growth * WeekdayFactor[weekday] * spike * (0.85 + 0.3 * rng.NextDouble()));
+            var billCount = (int)Math.Round(profile.BillsPerDay * growth * profile.WeekdayFactor[weekday] * spike * (0.85 + 0.3 * rng.NextDouble()));
 
             for (var b = 0; b < billCount; b++)
             {
-                var hour = FirstHour + Pick(rng, HourWeight.Select(w => (double)w).ToArray());
+                var hour = profile.FirstHour + Pick(rng, profile.HourWeight.Select(w => (double)w).ToArray());
                 var createdAt = calendar.StartOfDayUtc(date).AddHours(hour).AddMinutes(rng.Next(60)).AddSeconds(rng.Next(60));
                 if (createdAt > nowUtc)
                     continue; // today only has the bills up to now
 
-                var lineCount = 1 + Pick(rng, [30, 28, 20, 12, 7, 3]);
+                var lineCount = 1 + Pick(rng, profile.LinesPerBillWeight);
                 var chosen = new List<(Product Product, int Quantity)>();
                 var weights = (double[])productWeights.Clone();
                 for (var l = 0; l < Math.Min(lineCount, products.Count); l++)
                 {
                     var index = Pick(rng, weights);
                     weights[index] = 0; // each product at most once per bill
-                    var quantity = 1 + Pick(rng, [65, 25, 7, 2, 1]);
+                    var quantity = 1 + Pick(rng, profile.QuantityWeight);
                     chosen.Add((products[index], quantity));
                 }
 
@@ -108,7 +89,7 @@ internal static class DemoHistory
                     paid = Math.Ceiling(totals.Total / note) * note;
                 }
 
-                var customer = useCustomers && rng.NextDouble() < 0.38 ? customers[Pick(rng, customerWeights)] : null;
+                var customer = useCustomers && rng.NextDouble() < profile.CustomerShare ? customers[Pick(rng, customerWeights)] : null;
                 string bill;
                 do { bill = $"BILL-{date:yyyyMMdd}-{rng.Next():X8}"; } while (!billNumbers.Add(bill));
 

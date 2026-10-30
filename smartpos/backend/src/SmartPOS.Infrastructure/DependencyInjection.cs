@@ -31,7 +31,9 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<SmartPosDbContext>());
 
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
-        services.AddScoped<ISampleDataSeeder, SampleDataSeeder>();
+        services.AddScoped<SampleDataSeeder>();
+        services.AddScoped<ISampleDataSeeder>(sp => sp.GetRequiredService<SampleDataSeeder>());
+        services.AddScoped<ResetDemoDataCommand>();
 
         // Email: real SMTP when Email:Smtp:Host is set; otherwise (development) log the message; otherwise do nothing.
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));

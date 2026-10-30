@@ -101,6 +101,46 @@ public class DemoHistoryTests
         Assert.InRange(share, 0.25, 0.5);
     }
 
+    private static Dictionary<Product, int> Catalogue(SampleData.DemoProfile profile) =>
+        profile.Products.ToDictionary(
+            p => new Product { Sku = p.Sku, Name = p.Name, Category = p.Category, Price = p.Price, CostPrice = p.CostPrice },
+            p => p.Stock);
+
+    [Fact]
+    public void The_pharmacy_profile_sells_only_pharmacy_products_to_its_own_customers()
+    {
+        var target = Catalogue(SampleData.Pharmacy);
+        var history = DemoHistory.Generate(3, 3, target, Calendar(), Now, 5, 100, 45, profile: SampleData.Pharmacy);
+
+        Assert.NotEmpty(history.Sales);
+        Assert.All(history.Sales.SelectMany(s => s.Items), i => Assert.StartsWith("PHM-", i.Sku));
+        var groceryNames = SampleData.Grocery.Customers.Select(c => c.Name).ToHashSet();
+        var groceryPhones = SampleData.Grocery.Customers.Select(c => c.Phone).ToHashSet();
+        Assert.All(history.Customers, c => Assert.DoesNotContain(c.Name, groceryNames));
+        Assert.All(history.Customers, c => Assert.DoesNotContain(c.Phone, groceryPhones));
+
+        // Same ledger guarantee as the grocery profile.
+        foreach (var (product, stock) in target)
+        {
+            var movements = history.Movements.Where(m => m.Product == product).OrderBy(m => m.CreatedAt).ToList();
+            Assert.Equal(stock, history.OpeningStock[product] + movements.Sum(m => m.QuantityChange));
+        }
+        Assert.All(history.Movements, m => Assert.True(m.QuantityAfter >= 0));
+    }
+
+    [Fact]
+    public void The_profiles_are_genuinely_different_shops()
+    {
+        Assert.Empty(SampleData.Pharmacy.Products.Select(p => p.Sku).Intersect(SampleData.Grocery.Products.Select(p => p.Sku)));
+        Assert.Empty(SampleData.Pharmacy.Products.Select(p => p.Category).Intersect(SampleData.Grocery.Products.Select(p => p.Category))
+            .Except(["Personal Care"]));                                                     // the only shared category name
+        Assert.Contains(SampleData.Pharmacy.Products, p => p.ShelfLifeDays < 0);            // something already expired
+        Assert.Contains(SampleData.Pharmacy.Products, p => p.ShelfLifeDays is >= 0 and <= 30); // something expiring soon
+        Assert.Contains(SampleData.Pharmacy.Products, p => p.Stock <= p.LowStockThreshold);  // something low
+        Assert.Same(SampleData.Pharmacy, SampleData.ProfileNamed(" Pharmacy "));
+        Assert.Throws<ArgumentException>(() => SampleData.ProfileNamed("bakery"));
+    }
+
     private sealed class FixedTime(DateTime utc) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utc);

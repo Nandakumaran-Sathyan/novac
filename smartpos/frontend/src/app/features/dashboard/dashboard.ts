@@ -17,6 +17,7 @@ import { HBarChart, HBarRow } from '../../shared/charts/hbar-chart';
 import { Heatmap } from '../../shared/charts/heatmap';
 import { KpiCard } from '../../shared/charts/kpi-card';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { AssistantChat } from '../assistant/assistant-chat';
 
 const PERIODS = [7, 30, 90] as const;
 /** Fixed colour per payment method (categorical slots 1-4), so a method keeps its colour whatever its rank. */
@@ -42,7 +43,7 @@ const hourShort = (h: number): string => `${h % 12 === 0 ? 12 : h % 12}${h < 12 
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe, RouterLink, StatCard, StockBadge, EmptyState, ErrorAlert, Loading, MoneyPipe, Icon,
-    KpiCard, AreaChart, BarChart, HBarChart, DonutChart, Heatmap,
+    KpiCard, AreaChart, BarChart, HBarChart, DonutChart, Heatmap, AssistantChat,
   ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',

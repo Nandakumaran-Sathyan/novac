@@ -80,6 +80,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/sales/sale-detail').then((m) => m.SaleDetail),
       },
       {
+        path: 'assistant',
+        title: 'Assistant',
+        loadComponent: () => import('./features/assistant/assistant-page').then((m) => m.AssistantPage),
+      },
+      {
         path: 'reports',
         title: 'Reports',
         loadComponent: () => import('./features/reports/reports').then((m) => m.Reports),

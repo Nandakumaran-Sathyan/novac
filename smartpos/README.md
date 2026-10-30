@@ -87,6 +87,15 @@ cd backend
 dotnet run --project src/SmartPOS.API -- seed-demo-history --email you@example.com --days 90
 ```
 
+To **replace** a shop's demo data with a different kind of shop (Development only; deletes that shop's products,
+stock, customers and sales, and leaves other shops alone; back up first):
+
+```bash
+dotnet run --project src/SmartPOS.API -- reset-demo-data --email you@example.com --profile pharmacy --days 90 --confirm
+```
+
+Profiles: `grocery` (default) and `pharmacy`. See [docs/DATABASE.md](docs/DATABASE.md#5-accounts-and-seed-data).
+
 ### 5. Run the frontend
 
 ```bash
@@ -156,6 +165,9 @@ The API refuses to start if `Jwt:SigningKey` is missing or too short, or if `Sto
 - **Sales**: history with date filters and bill-number search, itemised bill with
   each line's discount and tax.
 - **Reports**: daily sales and top products by revenue/profit for any date range.
+- **AI assistant** (local, via Ollama): ask in plain language, from the dashboard panel or the **Assistant** page,
+  about sales, top sellers, profit, low stock, expiry, inventory value and unsold products. Answers come only
+  from read-only queries on your own shop, and figures the data doesn't support are withheld. See [docs/AI.md](docs/AI.md).
 
 ## How loyalty points are calculated
 

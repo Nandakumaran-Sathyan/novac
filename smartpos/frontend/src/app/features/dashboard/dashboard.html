@@ -27,6 +27,16 @@
                      [tone]="s.lowStockCount > 0 ? 'warning' : 'default'" hint="At or below the low-stock level" />
     </section>
 
+    <section class="card assistant-card" aria-labelledby="assistant-heading">
+      <div class="card-header">
+        <h2 id="assistant-heading"><app-icon name="sparkles" [size]="16" /> Ask the assistant</h2>
+        <a routerLink="/assistant" class="btn btn-ghost btn-sm">Open full page</a>
+      </div>
+      <div class="card-body">
+        <app-assistant-chat [compact]="true" />
+      </div>
+    </section>
+
     <div class="section-head">
       <div>
         <h2>Sales performance</h2>

@@ -16,6 +16,10 @@ if (args.Length > 0 && args[0] == "seed-demo-history")
 {
     return await SeedDemoHistoryAsync(app, args);
 }
+if (args.Length > 0 && args[0] == "reset-demo-data")
+{
+    return await ResetDemoDataAsync(app, args);
+}
 if (args.Length > 0 && args[0] == "reset-password")
 {
     return await ResetPasswordAsync(app, args);
@@ -67,6 +71,45 @@ static async Task<int> SeedDemoHistoryAsync(WebApplication app, string[] args)
         return 0;
     }
     catch (InvalidOperationException ex)
+    {
+        Console.Error.WriteLine(ex.Message);
+        return 1;
+    }
+}
+
+static async Task<int> ResetDemoDataAsync(WebApplication app, string[] args)
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        Console.Error.WriteLine("reset-demo-data deletes a shop's data and only runs in the Development environment.");
+        return 1;
+    }
+    string? Option(string name) => args.SkipWhile(a => a != name).Skip(1).FirstOrDefault();
+    var email = Option("--email");
+    var profile = Option("--profile") ?? "grocery";
+    if (string.IsNullOrWhiteSpace(email))
+    {
+        Console.Error.WriteLine("Usage: reset-demo-data --email <account email> --profile grocery|pharmacy [--days 90] --confirm");
+        return 1;
+    }
+    if (!args.Contains("--confirm"))
+    {
+        Console.Error.WriteLine($"This DELETES every product, stock record, customer and sale of the shop owned by {email} and replaces them " +
+                                $"with '{profile}' demo data. Other shops are not touched. Add --confirm to proceed.");
+        return 1;
+    }
+    var days = int.TryParse(Option("--days"), out var d) ? d : 90;
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var (deleted, created) = await scope.ServiceProvider.GetRequiredService<ResetDemoDataCommand>().RunAsync(email, profile, days, CancellationToken.None);
+        Console.WriteLine($"Shop {deleted.ShopId} '{deleted.ShopName}': removed {deleted.Products} products, {deleted.Customers} customers, " +
+                          $"{deleted.Sales} sales, {deleted.Movements} stock movements.");
+        Console.WriteLine($"Seeded the '{created.Profile}' profile: {created.Products} products, {created.Customers} customers, " +
+                          $"{created.Sales} sales, {created.Movements} stock movements. Other shops were not touched.");
+        return 0;
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
     {
         Console.Error.WriteLine(ex.Message);
         return 1;

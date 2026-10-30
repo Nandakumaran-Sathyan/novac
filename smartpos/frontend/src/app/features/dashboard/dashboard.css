@@ -1,3 +1,6 @@
+.assistant-card h2 { display: inline-flex; align-items: center; gap: 8px; }
+.assistant-card h2 app-icon { color: var(--color-primary); }
+.assistant-card .card-body { padding: 14px 18px 12px; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .section-head h2 { margin: 0; font-size: 1.0625rem; }
 .section-head .sub { color: var(--color-text-muted); font-size: 0.8125rem; }

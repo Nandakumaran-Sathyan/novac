@@ -42,10 +42,18 @@ public sealed class SampleDataSeeder(
     {
         if (!options.Value.SeedSampleData)
             return;
+        await SeedProfileAsync(shopId, SampleData.Grocery, options.Value.SeedDemoHistory, options.Value.DemoHistoryDays, cancellationToken);
+    }
 
+    /// <summary>
+    /// Adds a profile's catalogue (and, if asked, its fabricated history) to an empty shop. Used at registration
+    /// (grocery) and by the reset-demo-data command (any profile). Does not save existing data or check for it.
+    /// </summary>
+    internal async Task SeedProfileAsync(int shopId, SampleData.DemoProfile profile, bool withHistory, int historyDays, CancellationToken cancellationToken)
+    {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var created = new List<(Product Product, SampleData.ProductSeed Seed)>();
-        foreach (var p in SampleData.Products)
+        foreach (var p in profile.Products)
         {
             var product = new Product
             {
@@ -72,14 +80,14 @@ public sealed class SampleDataSeeder(
         }
 
         DemoHistory.Result? history = null;
-        if (options.Value.SeedDemoHistory)
+        if (withHistory)
         {
             var userId = await db.Users.IgnoreQueryFilters().Where(u => u.ShopId == shopId)
                 .Select(u => u.Id).FirstAsync(cancellationToken);
             history = DemoHistory.Generate(
                 shopId, userId, created.ToDictionary(c => c.Product, c => c.Seed.Stock), calendar, now,
-                posOptions.Value.TaxRatePercent, posOptions.Value.MaxDiscountPercent, Math.Clamp(options.Value.DemoHistoryDays, 1, 365),
-                loyaltyOptions.Value.SpendPerPoint);
+                posOptions.Value.TaxRatePercent, posOptions.Value.MaxDiscountPercent, Math.Clamp(historyDays, 1, 365),
+                loyaltyOptions.Value.SpendPerPoint, profile: profile);
             db.Customers.AddRange(history.Customers);
             db.Sales.AddRange(history.Sales);
             db.StockMovements.AddRange(history.Movements);

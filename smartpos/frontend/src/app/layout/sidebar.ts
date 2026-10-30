@@ -17,6 +17,7 @@ const NAV: NavItem[] = [
   { label: 'Products', path: '/products', icon: 'package' },
   { label: 'Inventory', path: '/inventory', icon: 'layers' },
   { label: 'Reports', path: '/reports', icon: 'chart' },
+  { label: 'Assistant', path: '/assistant', icon: 'sparkles' },
 ];
 
 @Component({

@@ -91,6 +91,16 @@ quoted** (`"\"Price\" >= 0"` in C#); the configurations already do this.
   it refuses to run if the shop already has anything dated before its own creation. It is all-or-nothing (one transaction).
 - The generator is seeded per shop, so a given shop always gets the same history but two shops never share a
   bill number (`BillNumber` is unique across the whole database).
+- **Replacing a shop's demo data with another profile:**
+  `dotnet run --project src/SmartPOS.API -- reset-demo-data --email <account email> --profile pharmacy|grocery [--days 90] --confirm`
+  (Development only). It **deletes all of that shop's** products, inventory, customers, sales, sale lines and
+  stock movements, then seeds the chosen profile with fabricated history, in one transaction. Only rows with that
+  shop's `ShopId` are touched; the user, the shop and every other shop stay as they are. Without `--confirm` it
+  refuses. Back the database up first (`pg_dump -Fc`).
+- **Profiles**: `grocery` (the default for new shops: 16 products, 16 customers `90000001xx`) and `pharmacy`
+  (18 products in Pain Relief, Cold & Cough, Digestive Care, Vitamins & Supplements, First Aid, Diabetes Care,
+  Personal Care and Baby Care; 12 customers `90000002xx`; about 20 bills a day; one item already expired, a few
+  expiring within a month, and some low on stock, so the expiry and low-stock views have something to show).
 - Without that option, no sales or customers are seeded.
 
 To start over in development: `DROP DATABASE smartpos_dev;`, recreate it, run `dotnet ef database update`.
