@@ -22,8 +22,6 @@ public class SaleItem
     public decimal UnitCost { get; set; }
     /// <summary>This line's share of the sale-level discount.</summary>
     public decimal DiscountAmount { get; set; }
-    /// <summary>Tax on this line, charged after its discount.</summary>
-    public decimal TaxAmount { get; set; }
-    /// <summary>Final amount for this line: unit price × quantity − discount + tax.</summary>
+    /// <summary>Final amount for this line: unit price × quantity − discount.</summary>
     public decimal LineTotal { get; set; }
 }

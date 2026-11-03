@@ -42,14 +42,13 @@
           <div class="table-wrap">
             <table class="table">
               <thead>
-                <tr><th scope="col">Date</th><th scope="col" class="num">Sales</th><th scope="col" class="num hide-sm">Tax</th><th scope="col" class="num">Total</th><th scope="col" class="bar-col"><span class="sr-only">Relative total</span></th></tr>
+                <tr><th scope="col">Date</th><th scope="col" class="num">Sales</th><th scope="col" class="num">Total</th><th scope="col" class="bar-col"><span class="sr-only">Relative total</span></th></tr>
               </thead>
               <tbody>
                 @for (day of d.days; track day.date) {
                   <tr>
                     <td class="nowrap">{{ day.date | date: 'EEE, MMM d' }}</td>
                     <td class="num">{{ day.transactionCount }}</td>
-                    <td class="num hide-sm">{{ day.taxAmount | money }}</td>
                     <td class="num">{{ day.total | money }}</td>
                     <td class="bar-col"><span class="bar" [style.width]="barWidth(day.total)" aria-hidden="true"></span></td>
                   </tr>

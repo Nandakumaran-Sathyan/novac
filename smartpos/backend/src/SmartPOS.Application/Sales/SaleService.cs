@@ -59,8 +59,7 @@ public sealed class SaleService(
         // Prices come from the database, never from the client.
         var totals = SaleCalculator.Calculate(
             lines.Select(l => new SaleLineInput(products[l.ProductId].Price, l.Quantity)).ToList(),
-            request.DiscountPercent,
-            options.TaxRatePercent);
+            request.DiscountPercent);
         var (amountPaid, changeAmount) = SaleCalculator.Settle(totals.Total, request.PaymentMethod, request.AmountPaid);
 
         var now = calendar.UtcNow;
@@ -73,8 +72,6 @@ public sealed class SaleService(
             Subtotal = totals.Subtotal,
             DiscountPercent = request.DiscountPercent,
             DiscountAmount = totals.DiscountAmount,
-            TaxRatePercent = options.TaxRatePercent,
-            TaxAmount = totals.TaxAmount,
             TotalAmount = totals.Total,
             PaymentMethod = request.PaymentMethod,
             AmountPaid = amountPaid,
@@ -105,7 +102,6 @@ public sealed class SaleService(
                 UnitPrice = product.Price,
                 UnitCost = product.CostPrice,
                 DiscountAmount = totals.LineDiscounts[i],
-                TaxAmount = totals.LineTaxes[i],
                 LineTotal = totals.LineTotals[i]
             });
             db.StockMovements.Add(new StockMovement
@@ -172,11 +168,11 @@ public sealed class SaleService(
                            s.Id, s.BillNumber, s.CreatedAt, s.UserId, s.User.FullName,
                            s.CustomerId, s.Customer != null ? s.Customer.Name : null,
                            s.Status, s.PaymentMethod, s.LoyaltyPointsEarned, s.Customer != null ? s.Customer.LoyaltyPoints : null,
-                           s.Subtotal, s.DiscountPercent, s.DiscountAmount, s.TaxRatePercent, s.TaxAmount,
+                           s.Subtotal, s.DiscountPercent, s.DiscountAmount,
                            s.TotalAmount, s.AmountPaid, s.ChangeAmount,
                            s.Items.OrderBy(i => i.Id)
                                .Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity,
-                                   i.UnitPrice, i.DiscountAmount, i.TaxAmount, i.LineTotal))
+                                   i.UnitPrice, i.DiscountAmount, i.LineTotal))
                                .ToList()))
                        .SingleOrDefaultAsync(cancellationToken)
                    ?? throw NotFoundException.For("Sale", id);
@@ -192,7 +188,7 @@ public sealed class SaleService(
             .Select(s => new { s.ShopName, s.Address })
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw NotFoundException.For("Shop", currentUser.ShopId);
-        return new PosSettingsDto(shop.ShopName, shop.Address, store.CurrencyCode, store.TimeZoneId, pos.TaxRatePercent,
+        return new PosSettingsDto(shop.ShopName, shop.Address, store.CurrencyCode, store.TimeZoneId,
             DiscountPolicy.MaxDiscountPercent(pos), loyaltyOptions.Value.SpendPerPoint);
     }
 

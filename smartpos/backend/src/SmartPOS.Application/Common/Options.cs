@@ -54,9 +54,6 @@ public sealed class PosOptions
 {
     public const string SectionName = "Pos";
 
-    [Range(0, 100)]
-    public decimal TaxRatePercent { get; set; }
-
     /// <summary>Highest sale-level discount a bill may carry.</summary>
     [Range(0, 100)]
     public decimal MaxDiscountPercent { get; set; } = 100;

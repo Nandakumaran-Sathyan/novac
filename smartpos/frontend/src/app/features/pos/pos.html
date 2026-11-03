@@ -158,7 +158,6 @@
         <dl class="totals">
           <div><dt>Subtotal</dt><dd>{{ totals().subtotal | money }}</dd></div>
           <div><dt>Discount</dt><dd>−{{ totals().discountAmount | money }}</dd></div>
-          <div><dt>Tax ({{ taxRate() }}%)</dt><dd>{{ totals().taxAmount | money }}</dd></div>
           <div class="grand"><dt>Total</dt><dd>{{ totals().total | money }}</dd></div>
         </dl>
 

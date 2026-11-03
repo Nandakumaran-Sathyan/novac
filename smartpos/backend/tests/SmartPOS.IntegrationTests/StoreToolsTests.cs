@@ -57,14 +57,13 @@ public class StoreToolsTests(SmartPosApiFactory factory) : IClassFixture<SmartPo
         var user = await factory.UserClientAsync();
         var before = await AsShop(user, sp => sp.GetRequiredService<IStoreAITools>().GetSalesSummaryAsync(StorePeriod.Today, default));
         var product = await Product(user, "T-SALE", 100m, 60m, 10);
-        await Sell(user, (product.Id, 2));   // 200 + 5% tax = 210
-        await Sell(user, (product.Id, 1));   // 100 + 5% = 105
+        await Sell(user, (product.Id, 2));   // 200
+        await Sell(user, (product.Id, 1));   // 100
 
         var after = await AsShop(user, sp => sp.GetRequiredService<IStoreAITools>().GetSalesSummaryAsync(StorePeriod.Today, default));
 
-        Assert.Equal(before.TotalSales + 315m, after.TotalSales);
+        Assert.Equal(before.TotalSales + 300m, after.TotalSales);
         Assert.Equal(before.Bills + 2, after.Bills);
-        Assert.Equal(before.TaxCollected + 15m, after.TaxCollected);
         Assert.Equal("today", after.Period);
         Assert.Equal(after.From, after.To);
     }

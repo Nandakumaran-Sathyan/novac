@@ -86,7 +86,7 @@ public sealed class SampleDataSeeder(
                 .Select(u => u.Id).FirstAsync(cancellationToken);
             history = DemoHistory.Generate(
                 shopId, userId, created.ToDictionary(c => c.Product, c => c.Seed.Stock), calendar, now,
-                posOptions.Value.TaxRatePercent, posOptions.Value.MaxDiscountPercent, Math.Clamp(historyDays, 1, 365),
+                posOptions.Value.MaxDiscountPercent, Math.Clamp(historyDays, 1, 365),
                 loyaltyOptions.Value.SpendPerPoint, profile: profile);
             db.Customers.AddRange(history.Customers);
             db.Sales.AddRange(history.Sales);

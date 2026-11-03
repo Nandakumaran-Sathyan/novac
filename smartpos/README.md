@@ -126,7 +126,6 @@ behaviour (concurrency, generated SQL) was verified.
 | `Jwt__Issuer` / `Jwt__Audience` | no | `SmartPOS.Api` / `SmartPOS.Web` | Token validation |
 | `Jwt__ExpiryMinutes` | no | 480 | Token lifetime (one shift) |
 | `Store__Name`, `Store__CurrencyCode`, `Store__TimeZoneId` | no | `SmartPOS Store`, `INR`, `Asia/Kolkata` | Money format and what "today" means (same for all shops) |
-| `Pos__TaxRatePercent` | no | 5 | Tax applied after discount |
 | `Pos__MaxDiscountPercent` | no | 100 | Highest discount a bill may carry |
 | `Cors__AllowedOrigins__0` | no | `http://localhost:4200` in Development | Browser origins allowed to call the API |
 | `Loyalty__SpendPerPoint` | no | 100 | Amount spent to earn one loyalty point |
@@ -160,10 +159,10 @@ The API refuses to start if `Jwt:SigningKey` is missing or too short, or if `Sto
 - **Inventory**: per-product stock rows with a low-stock threshold, sorted by urgency, low/out-of-stock
   filters, adjustments with a reason, full stock-movement history.
 - **POS**: product search/barcode scan with Enter-to-add, cart with quantity limits, discount within the
-  configured limit, tax, payment by Cash/Card/UPI/Other, cash received and change due, optional customer,
+  configured limit (no tax is charged), payment by Cash/Card/UPI/Other, cash received and change due, optional customer,
   keyboard shortcuts, printable bill after checkout.
 - **Sales**: history with date filters and bill-number search, itemised bill with
-  each line's discount and tax.
+  each line's discount.
 - **Reports**: daily sales and top products by revenue/profit for any date range.
 - **AI assistant** (local, via Ollama): ask in plain language, from the dashboard panel or the **Assistant** page,
   about sales, top sellers, profit, low stock, expiry, inventory value and unsold products. Answers come only
@@ -177,7 +176,7 @@ A bill that has a **customer attached** earns
 points = floor( bill total ÷ Loyalty:SpendPerPoint )
 ```
 
-- **Bill total** is what the customer actually pays: after the discount, with tax (the `TotalAmount` on the bill).
+- **Bill total** is what the customer actually pays: after the discount (the `TotalAmount` on the bill).
 - **`Loyalty:SpendPerPoint`** is a setting (default **100**, so 1 point per ₹100). It must be at least 1.
 - **Always rounded down**: a part-point is never awarded. With the default: ₹99.99 → 0 points, ₹100.00 → 1,
   ₹456.75 → 4, ₹3,076.50 → 30.
@@ -237,10 +236,11 @@ dotnet run --project src/SmartPOS.API -- reset-password --email you@example.com
   `Sale`, conflict handling for stock that ran out meanwhile, and a service worker.
 - Refunds/returns and sale voiding are not implemented. `Sales.Status` already has `Cancelled` (and
   `Pending`), and reports ignore anything but `Completed`, but nothing sets them yet.
-- **No staff accounts.** One login per shop owner; there is no way to give an employee their own login or limit what they can do. Currency, time zone and tax rate are global settings, not per shop.
+- **No staff accounts.** One login per shop owner; there is no way to give an employee their own login or limit what they can do. Currency and time zone are global settings, not per shop.
 - **Email is verified by link but not enforced**: an unconfirmed account can use everything. There is **no self-service password reset or change-password screen** yet (use the `reset-password` command above in Development). Phone numbers are only format-checked.
 - Loyalty points are earned but cannot be **spent** yet (no redemption, expiry or tiers), and are not reversed on a cancelled bill because there is no cancel feature.
-- Single tax rate, sale-level discount only (it is split across lines, but there are no per-line
+- **No tax.** Bills carry no tax (GST/VAT); adding it back would need a new migration and a tax line on the
+  POS and the bill. Sale-level discount only (it is split across lines, but there are no per-line
   discounts or promotions).
 - No barcode-scanner hardware integration beyond "scanner types SKU + Enter" into the search box.
 - JWTs are stored in `localStorage`; a refresh-token/HTTP-only-cookie flow would reduce XSS exposure.
@@ -251,6 +251,7 @@ dotnet run --project src/SmartPOS.API -- reset-password --email you@example.com
 
 ## Documentation
 
+- [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md): beginner's guide to every backend file, with code, how the files link, and one request traced end to end
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): layers, request flow, key decisions and trade-offs
 - [docs/DATABASE.md](docs/DATABASE.md): PostgreSQL setup, migrations, schema and integrity rules
 - [docs/API.md](docs/API.md): endpoint reference, error format

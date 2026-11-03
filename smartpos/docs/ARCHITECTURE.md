@@ -26,7 +26,7 @@ atomic conditional stock update), so concurrency-sensitive SQL lives in one plac
 ### Request flow: completing a sale
 
 1. `POST /api/sales` → `[ApiController]` validates the DTO (items ≥ 1, quantity 1–10,000, discount 0–100, amount paid ≥ 0) → 400 with field errors if invalid.
-2. `SaleService.CreateAsync`: checks the discount against the configured limit (`DiscountPolicy` → 403), merges duplicate lines, loads prices **from the database**, pre-checks stock (`StockRules` → 409 with a clear message), computes totals and each line's share of discount and tax (`SaleCalculator`), then the change due (`SaleCalculator.Settle`).
+2. `SaleService.CreateAsync`: checks the discount against the configured limit (`DiscountPolicy` → 403), merges duplicate lines, loads prices **from the database**, pre-checks stock (`StockRules` → 409 with a clear message), computes totals and each line's share of the discount (`SaleCalculator`), then the change due (`SaleCalculator.Settle`).
 3. In one transaction: conditional stock decrement on the product's `Inventories` row per line (authoritative oversell guard), insert `Sale`, `SaleItems` (price/name snapshots) and `StockMovements`; commit.
 4. Exceptions map to problem+json responses in `GlobalExceptionHandler`.
 

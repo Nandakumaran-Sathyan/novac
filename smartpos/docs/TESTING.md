@@ -4,7 +4,7 @@
 
 | Suite | Command | Count | Covers |
 |---|---|---|---|
-| Backend unit | `cd backend && dotnet test tests/SmartPOS.UnitTests` | 63 | `LoyaltyRules` (rounding down, rates, nonsense input), `DemoHistory` (loyalty balances, stock ledger ends exactly on the target and never goes negative, bills internally consistent, deterministic, weekend/customer patterns), `SaleCalculator` (totals, rounding, discount-then-tax, line-level discount/tax allocation that sums exactly, payment settlement and change, invalid input), `StockRules` (availability, adjustments, status), `DiscountPolicy`, `StoreCalendar` (time-zone day boundaries), LIKE escaping, decimal-places validation |
+| Backend unit | `cd backend && dotnet test tests/SmartPOS.UnitTests` | 63 | `LoyaltyRules` (rounding down, rates, nonsense input), `DemoHistory` (loyalty balances, stock ledger ends exactly on the target and never goes negative, bills internally consistent, deterministic, weekend/customer patterns), `SaleCalculator` (totals, rounding, line-level discount allocation that sums exactly, payment settlement and change, invalid input), `StockRules` (availability, adjustments, status), `DiscountPolicy`, `StoreCalendar` (time-zone day boundaries), LIKE escaping, decimal-places validation |
 | Backend integration | `cd backend && dotnet test tests/SmartPOS.IntegrationTests` | 51 | Real HTTP pipeline via `WebApplicationFactory` on in-memory SQLite, with two shops: registration (duplicate email, weak password, new shop starts empty), login/401, product validation, duplicate SKU and barcode, pagination, sale pricing + stock deduction + movements, cash change and payment rules, customers on sales, points earned per bill and added atomically to the balance, email verification (link works once, replaced links die, forged tokens fail, resend, throwaway and undeliverable domains refused, failed lookups allowed), dashboard insights (KPIs, heatmap, payments, categories, shop isolation, range validation), **one shop cannot see, change or sell another shop's data**, oversell rejection with full rollback, discount limits, historical prices after edits, delete rules, adjustments, cashier visibility, dashboard/report figures |
 | Frontend unit | `cd frontend && npm test` | 22 | Cart totals (mirrors the server example to the cent, float-drift cases), cart line rules, chart axis scaling and percentage-change maths, API error-message mapping, query-param building, date helpers |
 
@@ -19,7 +19,7 @@ against PostgreSQL 16:
 - `dotnet ef database update` applied `InitialCreate` cleanly to an empty database (8 tables, indexes,
   CHECK constraints), and so did the plain `database/schema.sql` script.
 - A scripted end-to-end run (70 checks) covering registration, every endpoint, validation, arithmetic,
-  line-level discount/tax sums, cash change, customers, barcode search, rollback, history preservation,
+  line-level discount sums, cash change, customers, barcode search, rollback, history preservation,
   case-insensitive search, and isolation between two registered shops, all passing.
 - **Concurrency:** 12 parallel single-unit sales against 5 units of stock → exactly 5 × 201,
   7 × 409, final stock 0.

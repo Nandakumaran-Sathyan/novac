@@ -134,8 +134,7 @@ export interface SaleItem {
   unitPrice: number;
   /** This line's share of the sale discount. */
   discountAmount: number;
-  taxAmount: number;
-  /** Final amount for the line: unit price × quantity − discount + tax. */
+  /** Final amount for the line: unit price × quantity − discount. */
   lineTotal: number;
 }
 
@@ -156,8 +155,6 @@ export interface Sale {
   subtotal: number;
   discountPercent: number;
   discountAmount: number;
-  taxRatePercent: number;
-  taxAmount: number;
   totalAmount: number;
   amountPaid: number;
   changeAmount: number;
@@ -190,7 +187,6 @@ export interface PosSettings {
   storeAddress: string;
   currencyCode: string;
   timeZoneId: string;
-  taxRatePercent: number;
   maxDiscountPercent: number;
   /** Amount spent to earn one loyalty point. */
   loyaltySpendPerPoint: number;
@@ -237,7 +233,7 @@ export interface PaymentSlice {
 export interface CategorySlice {
   category: string;
   units: number;
-  /** Net sales: after discount, before tax. */
+  /** Net sales: after discount. */
   revenue: number;
 }
 
@@ -278,7 +274,6 @@ export interface DailySalesRow {
   transactionCount: number;
   subtotal: number;
   discountAmount: number;
-  taxAmount: number;
   total: number;
 }
 

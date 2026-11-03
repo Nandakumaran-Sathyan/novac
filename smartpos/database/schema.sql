@@ -1,7 +1,7 @@
 -- SmartPOS schema for PostgreSQL 14 or newer.
 -- GENERATED from the EF Core migrations; EF Core migrations remain the source of truth.
 -- Regenerate with:  dotnet ef migrations script --project src/SmartPOS.Infrastructure --startup-project src/SmartPOS.API -o ../database/schema.sql
--- It also records the migration in __EFMigrationsHistory, so `dotnet ef database update` treats it as applied.
+-- It also records the migrations in __EFMigrationsHistory, so `dotnet ef database update` treats them as applied.
 CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
     "MigrationId" character varying(150) NOT NULL,
     "ProductVersion" character varying(32) NOT NULL,
@@ -182,6 +182,53 @@ CREATE UNIQUE INDEX "IX_Users_ShopId" ON "Users" ("ShopId");
 
 INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
 VALUES ('20261028092049_InitialCreate', '10.0.12');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE "Users" ADD "EmailVerificationExpiresAt" timestamp with time zone;
+
+ALTER TABLE "Users" ADD "EmailVerificationTokenHash" character varying(64);
+
+ALTER TABLE "Users" ADD "EmailVerifiedAt" timestamp with time zone;
+
+ALTER TABLE "Sales" ADD "LoyaltyPointsEarned" integer NOT NULL DEFAULT 0;
+
+ALTER TABLE "Sales" ADD CONSTRAINT "CK_Sales_LoyaltyPointsEarned_NonNegative" CHECK ("LoyaltyPointsEarned" >= 0);
+
+UPDATE "Sales" SET "LoyaltyPointsEarned" = FLOOR("TotalAmount" / 100)::integer
+WHERE "CustomerId" IS NOT NULL AND "Status" = 'Completed';
+
+UPDATE "Customers" c SET "LoyaltyPoints" =
+    COALESCE((SELECT SUM(s."LoyaltyPointsEarned") FROM "Sales" s WHERE s."CustomerId" = c."Id"), 0);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261028111930_AddLoyaltyAndEmailVerification', '10.0.12');
+
+COMMIT;
+
+START TRANSACTION;
+UPDATE "SaleItems" SET "LineTotal" = "LineTotal" - "TaxAmount";
+
+UPDATE "Sales" SET
+    "AmountPaid" = CASE WHEN "ChangeAmount" = 0 THEN "TotalAmount" - "TaxAmount" ELSE "AmountPaid" END,
+    "ChangeAmount" = CASE WHEN "ChangeAmount" = 0 THEN 0 ELSE "AmountPaid" - ("TotalAmount" - "TaxAmount") END,
+    "TotalAmount" = "TotalAmount" - "TaxAmount";
+
+UPDATE "Sales" SET "LoyaltyPointsEarned" = FLOOR("TotalAmount" / 100)::integer
+WHERE "CustomerId" IS NOT NULL AND "Status" = 'Completed';
+
+UPDATE "Customers" c SET "LoyaltyPoints" =
+    COALESCE((SELECT SUM(s."LoyaltyPointsEarned") FROM "Sales" s WHERE s."CustomerId" = c."Id"), 0);
+
+ALTER TABLE "Sales" DROP COLUMN "TaxAmount";
+
+ALTER TABLE "Sales" DROP COLUMN "TaxRatePercent";
+
+ALTER TABLE "SaleItems" DROP COLUMN "TaxAmount";
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261103131345_RemoveTax', '10.0.12');
 
 COMMIT;
 

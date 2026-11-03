@@ -83,16 +83,14 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
         var sale = (await response.Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
         Assert.Equal(299.97m, sale.Subtotal);
         Assert.Equal(30.00m, sale.DiscountAmount);   // 29.997
-        Assert.Equal(13.50m, sale.TaxAmount);        // 5% of 269.97 = 13.4985
-        Assert.Equal(283.47m, sale.TotalAmount);
+        Assert.Equal(269.97m, sale.TotalAmount);     // no tax on top
         Assert.Equal(SaleStatus.Completed, sale.Status);
         Assert.StartsWith("BILL-", sale.BillNumber);
         var item = Assert.Single(sale.Items);
         Assert.Equal(99.99m, item.UnitPrice);
-        // A single line carries the whole sale discount and tax, so its total is the bill total.
+        // A single line carries the whole sale discount, so its total is the bill total.
         Assert.Equal(30.00m, item.DiscountAmount);
-        Assert.Equal(13.50m, item.TaxAmount);
-        Assert.Equal(283.47m, item.LineTotal);
+        Assert.Equal(269.97m, item.LineTotal);
         Assert.Equal(7, await StockOf(user, product.Id));
 
         var movements = await user.GetFromJsonAsync<PagedResult<StockMovementDto>>(
@@ -209,7 +207,7 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
 
         var after = (await user.GetFromJsonAsync<DashboardSummaryDto>("/api/dashboard/summary", SmartPosApiFactory.Json))!;
         Assert.Equal(before.TodayTransactionCount + 1, after.TodayTransactionCount);
-        Assert.Equal(before.TodaySalesTotal + 21.00m, after.TodaySalesTotal); // 20 + 5% tax
+        Assert.Equal(before.TodaySalesTotal + 20.00m, after.TodaySalesTotal); // 2 × 10, no tax
         Assert.Contains(after.LowStockProducts, p => p.ProductId == product.Id); // 3 left, threshold 4
 
         var top = await user.GetStringAsync("/api/reports/top-products?limit=50");
@@ -230,13 +228,13 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
         });
         Assert.Equal(HttpStatusCode.Created, paid.StatusCode);
         var sale = (await paid.Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
-        Assert.Equal(105m, sale.TotalAmount);
+        Assert.Equal(100m, sale.TotalAmount);
         Assert.Equal(200m, sale.AmountPaid);
-        Assert.Equal(95m, sale.ChangeAmount);
+        Assert.Equal(100m, sale.ChangeAmount);
 
         var short_ = await user.PostAsJsonAsync("/api/sales", new
         {
-            items = new[] { new { productId = product.Id, quantity = 1 } }, paymentMethod = "Cash", amountPaid = 100
+            items = new[] { new { productId = product.Id, quantity = 1 } }, paymentMethod = "Cash", amountPaid = 99.99
         });
         Assert.Equal(HttpStatusCode.BadRequest, short_.StatusCode);
 
@@ -264,7 +262,7 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
     }
 
     [Fact]
-    public async Task Line_discounts_and_taxes_add_up_to_the_sale_totals()
+    public async Task Line_discounts_add_up_to_the_sale_totals()
     {
         var user = await factory.UserClientAsync();
         var a = await CreateProductAsync(user, "SPLIT-A", 33.33m, 20);
@@ -283,8 +281,8 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
         var sale = (await response.Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
 
         Assert.Equal(sale.DiscountAmount, sale.Items.Sum(i => i.DiscountAmount));
-        Assert.Equal(sale.TaxAmount, sale.Items.Sum(i => i.TaxAmount));
         Assert.Equal(sale.TotalAmount, sale.Items.Sum(i => i.LineTotal));
+        Assert.Equal(sale.Subtotal - sale.DiscountAmount, sale.TotalAmount);
     }
 
     [Fact]
@@ -382,7 +380,7 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
         Assert.Equal(7, after.Daily.Count);
         Assert.Equal(before.Kpis.Bills.Current + 2, after.Kpis.Bills.Current);
         Assert.Equal(before.Kpis.ItemsSold.Current + 3, after.Kpis.ItemsSold.Current);
-        Assert.Equal(before.Kpis.Revenue.Current + 315m, after.Kpis.Revenue.Current); // 3 × 100 + 5% tax
+        Assert.Equal(before.Kpis.Revenue.Current + 300m, after.Kpis.Revenue.Current); // 3 × 100, no tax
         Assert.Equal(after.Kpis.Bills.Current, after.Daily.Sum(d => d.Bills));
         Assert.Equal(after.Kpis.Bills.Current, after.Heatmap.SelectMany(row => row).Sum());
         Assert.Equal(7, after.Heatmap.Count);
@@ -418,17 +416,17 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
             .Content.ReadFromJsonAsync<Application.Customers.CustomerDto>(SmartPosApiFactory.Json))!;
         Assert.Equal(0, customer.LoyaltyPoints);
 
-        // 3 × 100 + 5% tax = 315.00 → 3 points.
+        // 3 × 100 = 300.00 → 3 points.
         var bill = (await (await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = product.Id, quantity = 3 } }, customerId = customer.Id }))
             .Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
-        Assert.Equal(315m, bill.TotalAmount);
+        Assert.Equal(300m, bill.TotalAmount);
         Assert.Equal(3, bill.LoyaltyPointsEarned);
         Assert.Equal(3, bill.CustomerLoyaltyPoints);
 
-        // 1 × 90 + 5% = 94.50 → a part-point is not awarded.
+        // 1 × 90 = 90.00 → a part-point is not awarded.
         var small = (await (await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = cheap.Id, quantity = 1 } }, customerId = customer.Id }))
             .Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
-        Assert.Equal(94.5m, small.TotalAmount);
+        Assert.Equal(90m, small.TotalAmount);
         Assert.Equal(0, small.LoyaltyPointsEarned);
 
         // Another 3-point bill takes the balance to 6.

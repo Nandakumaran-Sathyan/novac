@@ -20,7 +20,7 @@
         <div>
           <h1>{{ settings.storeName() }}</h1>
           @if (settings.settings()?.storeAddress) { <p class="muted">{{ settings.settings()!.storeAddress }}</p> }
-          <p class="muted">Tax invoice</p>
+          <p class="muted">Invoice</p>
         </div>
         <dl class="invoice-meta">
           <div><dt>Bill</dt><dd class="mono">{{ s.billNumber }}</dd></div>
@@ -35,7 +35,7 @@
 
       <table class="table invoice-table">
         <thead>
-          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num hide-sm">Discount</th><th scope="col" class="num hide-sm">Tax</th><th scope="col" class="num">Amount</th></tr>
+          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num hide-sm">Discount</th><th scope="col" class="num">Amount</th></tr>
         </thead>
         <tbody>
           @for (item of s.items; track item.id) {
@@ -44,7 +44,6 @@
               <td class="num">{{ item.quantity }}</td>
               <td class="num">{{ item.unitPrice | money }}</td>
               <td class="num hide-sm">{{ item.discountAmount > 0 ? '−' + (item.discountAmount | money) : '—' }}</td>
-              <td class="num hide-sm">{{ item.taxAmount | money }}</td>
               <td class="num">{{ item.lineTotal | money }}</td>
             </tr>
           }
@@ -56,7 +55,6 @@
         @if (s.discountAmount > 0) {
           <div><dt>Discount ({{ s.discountPercent }}%)</dt><dd>−{{ s.discountAmount | money }}</dd></div>
         }
-        <div><dt>Tax ({{ s.taxRatePercent }}%)</dt><dd>{{ s.taxAmount | money }}</dd></div>
         <div class="grand"><dt>Total</dt><dd>{{ s.totalAmount | money }}</dd></div>
         <div><dt>Paid ({{ s.paymentMethod }})</dt><dd>{{ s.amountPaid | money }}</dd></div>
         @if (s.changeAmount > 0) {

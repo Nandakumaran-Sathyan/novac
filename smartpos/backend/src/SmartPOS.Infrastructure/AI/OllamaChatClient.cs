@@ -209,4 +209,4 @@ public sealed class OllamaChatClient(HttpClient http, IOptions<OllamaOptions> op
     private sealed record WireVersion(string? Version);
 
     private sealed record WireShow(List<string>? Capabilities);
-}
+} 

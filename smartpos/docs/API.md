@@ -20,7 +20,7 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 | GET | `/api/auth/me` | Current user profile |
 | GET | `/api/dashboard/summary` | Today's totals, counts, recent sales, low-stock list |
 | GET | `/api/dashboard/insights` | `days` (1–180, default 30). Sales analytics for the last N store days: KPIs with the previous N days for comparison (revenue, bills, average bill, items sold, customers, gross profit), a daily series with the matching previous-period day, a weekday × hour bill-count heatmap, payment mix, net sales by category, top products and customers, and customer vs walk-in bills. Completed bills only; days, weekdays and hours are in the store time zone. 400 outside 1–180 |
-| GET | `/api/settings/pos` | Shop name and address, currency, tax rate, caller's max discount |
+| GET | `/api/settings/pos` | Shop name and address, currency, max discount, loyalty earning rate |
 | GET | `/api/products` | `search` (name, SKU or barcode), `category` (exact name), `includeInactive`, `page`, `pageSize` |
 | GET | `/api/products/{id}` | One product |
 | POST | `/api/products` | `{ sku, barcode?, name, description?, category, price, costPrice, lowStockThreshold, expiryDate?, initialStock }` → 201 (creates its inventory row; `initialStock` recorded as a movement) |
@@ -72,15 +72,15 @@ Errors use RFC 7807 problem details (`application/problem+json`) with a `traceId
 line subtotal = round(unit price × quantity)
 subtotal      = Σ line subtotals
 discount      = round(subtotal × discount% / 100)
-tax           = round((subtotal − discount) × tax% / 100)
-total         = subtotal − discount + tax
+total         = subtotal − discount
 ```
 
-Rounding: 2 decimals, half away from zero. The tax rate in effect is stored on each sale.
+Rounding: 2 decimals, half away from zero. No tax is charged (it was removed on 3 November 2026; the
+`RemoveTax` migration recalculated every earlier bill without it).
 
-The discount and tax are then shared out across the lines in proportion to their value, to the
-cent (largest-remainder), so each `SaleItem` has its own `discountAmount`, `taxAmount` and
-`lineTotal` (= subtotal − discount + tax) and the lines always add up exactly to the bill.
+The discount is then shared out across the lines in proportion to their value, to the cent
+(largest-remainder), so each `SaleItem` has its own `discountAmount` and `lineTotal`
+(= line subtotal − discount) and the lines always add up exactly to the bill.
 
 ## Loyalty points
 

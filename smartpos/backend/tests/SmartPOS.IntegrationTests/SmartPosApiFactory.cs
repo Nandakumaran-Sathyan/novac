@@ -116,7 +116,6 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Jwt:SigningKey", "integration-tests-only-signing-key-0123456789abcdef");
         builder.UseSetting("RateLimiting:LoginPermitsPerMinute", "1000");
         builder.UseSetting("Assistant:RequestsPerMinute", "1000"); // one dedicated test lowers it
-        builder.UseSetting("Pos:TaxRatePercent", "5");
         builder.UseSetting("Pos:MaxDiscountPercent", "50");
         builder.UseSetting("App:WebBaseUrl", "https://pos.test");
 

@@ -21,8 +21,6 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.Subtotal).HasPrecision(12, 2);
         builder.Property(s => s.DiscountPercent).HasPrecision(5, 2);
         builder.Property(s => s.DiscountAmount).HasPrecision(12, 2);
-        builder.Property(s => s.TaxRatePercent).HasPrecision(5, 2);
-        builder.Property(s => s.TaxAmount).HasPrecision(12, 2);
         builder.Property(s => s.TotalAmount).HasPrecision(12, 2);
         builder.Property(s => s.AmountPaid).HasPrecision(12, 2);
         builder.Property(s => s.ChangeAmount).HasPrecision(12, 2);

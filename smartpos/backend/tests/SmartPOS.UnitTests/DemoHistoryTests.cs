@@ -20,7 +20,7 @@ public class DemoHistoryTests
             p => p.Stock);
 
     private static DemoHistory.Result Generate(Dictionary<Product, int> target, int days = 30) =>
-        DemoHistory.Generate(1, 1, target, Calendar(), Now, taxRatePercent: 5, maxDiscountPercent: 100, days);
+        DemoHistory.Generate(1, 1, target, Calendar(), Now, maxDiscountPercent: 100, days);
 
     [Fact]
     public void Stock_ledger_runs_down_to_exactly_the_target_and_never_goes_negative()
@@ -48,7 +48,7 @@ public class DemoHistoryTests
         Assert.All(history.Sales, s =>
         {
             Assert.True(s.CreatedAt <= Now);
-            Assert.Equal(s.Subtotal - s.DiscountAmount + s.TaxAmount, s.TotalAmount);
+            Assert.Equal(s.Subtotal - s.DiscountAmount, s.TotalAmount);
             Assert.Equal(s.TotalAmount, s.AmountPaid - s.ChangeAmount);
             Assert.Equal(s.TotalAmount, s.Items.Sum(i => i.LineTotal));
             Assert.Equal(s.Items.Count, s.Items.Select(i => i.Product).Distinct().Count()); // one line per product
@@ -61,7 +61,7 @@ public class DemoHistoryTests
     [Fact]
     public void Loyalty_points_follow_the_earning_rule_and_add_up_to_each_customers_balance()
     {
-        var history = DemoHistory.Generate(1, 1, Catalogue(), Calendar(), Now, 5, 100, 60, loyaltySpendPerPoint: 100);
+        var history = DemoHistory.Generate(1, 1, Catalogue(), Calendar(), Now, 100, 60, loyaltySpendPerPoint: 100);
 
         Assert.All(history.Sales, s =>
             Assert.Equal(s.Customer is null ? 0 : (int)Math.Floor(s.TotalAmount / 100m), s.LoyaltyPointsEarned));
@@ -73,8 +73,8 @@ public class DemoHistoryTests
     [Fact]
     public void Two_shops_never_share_a_bill_number()
     {
-        var first = DemoHistory.Generate(1, 1, Catalogue(), Calendar(), Now, 5, 100, 30);
-        var second = DemoHistory.Generate(2, 2, Catalogue(), Calendar(), Now, 5, 100, 30);
+        var first = DemoHistory.Generate(1, 1, Catalogue(), Calendar(), Now, 100, 30);
+        var second = DemoHistory.Generate(2, 2, Catalogue(), Calendar(), Now, 100, 30);
         Assert.Empty(first.Sales.Select(s => s.BillNumber).Intersect(second.Sales.Select(s => s.BillNumber)));
     }
 
@@ -110,7 +110,7 @@ public class DemoHistoryTests
     public void The_pharmacy_profile_sells_only_pharmacy_products_to_its_own_customers()
     {
         var target = Catalogue(SampleData.Pharmacy);
-        var history = DemoHistory.Generate(3, 3, target, Calendar(), Now, 5, 100, 45, profile: SampleData.Pharmacy);
+        var history = DemoHistory.Generate(3, 3, target, Calendar(), Now, 100, 45, profile: SampleData.Pharmacy);
 
         Assert.NotEmpty(history.Sales);
         Assert.All(history.Sales.SelectMany(s => s.Items), i => Assert.StartsWith("PHM-", i.Sku));

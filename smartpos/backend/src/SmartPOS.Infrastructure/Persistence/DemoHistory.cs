@@ -29,7 +29,7 @@ internal static class DemoHistory
     /// <param name="targetStock">Stock each product should have once the history has played out.</param>
     public static Result Generate(
         int shopId, int userId, IReadOnlyDictionary<Product, int> targetStock,
-        StoreCalendar calendar, DateTime nowUtc, decimal taxRatePercent, decimal maxDiscountPercent, int days,
+        StoreCalendar calendar, DateTime nowUtc, decimal maxDiscountPercent, int days,
         decimal loyaltySpendPerPoint = 100, IReadOnlySet<string>? existingPhones = null, SampleData.DemoProfile? profile = null)
     {
         profile ??= SampleData.Grocery;
@@ -81,7 +81,7 @@ internal static class DemoHistory
 
                 var discount = Math.Min(maxDiscountPercent, new[] { 0m, 5m, 10m, 15m }[Pick(rng, [82, 9, 7, 2])]);
                 var method = new[] { PaymentMethod.Cash, PaymentMethod.UPI, PaymentMethod.Card, PaymentMethod.Other }[Pick(rng, [40, 38, 18, 4])];
-                var totals = SaleCalculator.Calculate(chosen.Select(c => new SaleLineInput(c.Product.Price, c.Quantity)).ToList(), discount, taxRatePercent);
+                var totals = SaleCalculator.Calculate(chosen.Select(c => new SaleLineInput(c.Product.Price, c.Quantity)).ToList(), discount);
                 var paid = totals.Total;
                 if (method == PaymentMethod.Cash && rng.NextDouble() < 0.5)
                 {
@@ -97,7 +97,7 @@ internal static class DemoHistory
                 {
                     BillNumber = bill, ShopId = shopId, UserId = userId, Customer = customer,
                     Subtotal = totals.Subtotal, DiscountPercent = discount, DiscountAmount = totals.DiscountAmount,
-                    TaxRatePercent = taxRatePercent, TaxAmount = totals.TaxAmount, TotalAmount = totals.Total,
+                    TotalAmount = totals.Total,
                     PaymentMethod = method, AmountPaid = paid, ChangeAmount = paid - totals.Total,
                     LoyaltyPointsEarned = customer is null ? 0 : LoyaltyRules.PointsEarned(totals.Total, loyaltySpendPerPoint),
                     Status = SaleStatus.Completed, CreatedAt = createdAt
@@ -111,7 +111,7 @@ internal static class DemoHistory
                     {
                         Product = product, ProductName = product.Name, Sku = product.Sku, Quantity = quantity,
                         UnitPrice = product.Price, UnitCost = product.CostPrice, DiscountAmount = totals.LineDiscounts[i],
-                        TaxAmount = totals.LineTaxes[i], LineTotal = totals.LineTotals[i]
+                        LineTotal = totals.LineTotals[i]
                     });
                     sold[product] += quantity;
                 }

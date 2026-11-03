@@ -13,7 +13,6 @@ export interface CartLine {
 export interface CartTotals {
   subtotal: number;
   discountAmount: number;
-  taxAmount: number;
   total: number;
 }
 
@@ -22,16 +21,13 @@ export interface CartTotals {
  * Works in integer cents and basis points so results match the server's decimal arithmetic
  * exactly, including half-away-from-zero rounding. The server's figures are still authoritative.
  */
-export function calculateTotals(lines: readonly CartLine[], discountPercent: number, taxRatePercent: number): CartTotals {
+export function calculateTotals(lines: readonly CartLine[], discountPercent: number): CartTotals {
   const subtotalCents = lines.reduce((sum, line) => sum + toCents(line.unitPrice) * line.quantity, 0);
   const discountCents = roundDiv(subtotalCents * toBasisPoints(discountPercent), 10_000);
-  const taxableCents = subtotalCents - discountCents;
-  const taxCents = roundDiv(taxableCents * toBasisPoints(taxRatePercent), 10_000);
   return {
     subtotal: subtotalCents / 100,
     discountAmount: discountCents / 100,
-    taxAmount: taxCents / 100,
-    total: (taxableCents + taxCents) / 100,
+    total: (subtotalCents - discountCents) / 100,
   };
 }
 

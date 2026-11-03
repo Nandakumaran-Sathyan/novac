@@ -15,12 +15,12 @@ public sealed record InsightKpis(
     Kpi Customers,
     Kpi GrossProfit);
 
-// Revenue is the day's bill totals (tax included); PreviousRevenue is the matching day of the previous period.
+// Revenue is the day's bill totals; PreviousRevenue is the matching day of the previous period.
 public sealed record DailyPoint(DateOnly Date, decimal Revenue, int Bills, decimal PreviousRevenue);
 
 public sealed record PaymentSlice(PaymentMethod Method, int Bills, decimal Amount);
 
-/// <summary>Net sales (after discount, before tax) of one product category.</summary>
+/// <summary>Net sales (after discount) of one product category.</summary>
 public sealed record CategorySlice(string Category, int Units, decimal Revenue);
 
 public sealed record ProductPerformance(int ProductId, string Sku, string Name, int Units, decimal Revenue, decimal GrossProfit);
@@ -77,14 +77,14 @@ public sealed class InsightsService(IApplicationDbContext db, StoreCalendar cale
         var current = bills.Where(b => b.CreatedAt >= fromUtc).ToList();
         var previous = bills.Where(b => b.CreatedAt < previousToUtc).ToList();
 
-        // Line items: net revenue (after discount, before tax), cost and units, per product.
+        // Line items: net revenue (after discount), cost and units, per product.
         var itemRows = await db.SaleItems.AsNoTracking()
             .Where(i => i.Sale.Status == SaleStatus.Completed && i.Sale.CreatedAt >= previousFromUtc && i.Sale.CreatedAt < toUtc)
             .Select(i => new
             {
                 i.ProductId, i.ProductName, i.Sku, i.Quantity,
                 Category = i.Product.Category,
-                Net = i.LineTotal - i.TaxAmount,
+                Net = i.LineTotal,
                 Cost = i.UnitCost * i.Quantity,
                 Current = i.Sale.CreatedAt >= fromUtc
             })

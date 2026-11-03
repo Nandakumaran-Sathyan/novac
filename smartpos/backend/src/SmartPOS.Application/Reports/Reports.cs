@@ -9,7 +9,6 @@ public sealed record DailySalesRow(
     int TransactionCount,
     decimal Subtotal,
     decimal DiscountAmount,
-    decimal TaxAmount,
     decimal Total);
 
 public sealed record DailySalesReport(
@@ -20,7 +19,7 @@ public sealed record DailySalesReport(
     decimal Total,
     decimal AverageSale);
 
-/// <summary>Revenue is net sales: line totals after discount and excluding tax. Profit is revenue minus cost.</summary>
+/// <summary>Revenue is net sales: line totals after discount. Profit is revenue minus cost.</summary>
 public sealed record TopProductRow(
     int ProductId,
     string Sku,
@@ -59,7 +58,7 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
         // would need the database to know the store's time zone, which MySQL may not have loaded.
         var sales = await db.Sales.AsNoTracking()
             .Where(s => s.Status == SaleStatus.Completed && s.CreatedAt >= fromUtc && s.CreatedAt < toUtc)
-            .Select(s => new { s.CreatedAt, s.Subtotal, s.DiscountAmount, s.TaxAmount, s.TotalAmount })
+            .Select(s => new { s.CreatedAt, s.Subtotal, s.DiscountAmount, s.TotalAmount })
             .ToListAsync(cancellationToken);
 
         var byDate = sales.ToLookup(s => calendar.ToStoreDate(s.CreatedAt));
@@ -67,8 +66,7 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
         for (var date = start; date <= end; date = date.AddDays(1))
         {
             var d = byDate[date].ToList();
-            days.Add(new DailySalesRow(date, d.Count, d.Sum(s => s.Subtotal), d.Sum(s => s.DiscountAmount),
-                d.Sum(s => s.TaxAmount), d.Sum(s => s.TotalAmount)));
+            days.Add(new DailySalesRow(date, d.Count, d.Sum(s => s.Subtotal), d.Sum(s => s.DiscountAmount), d.Sum(s => s.TotalAmount)));
         }
 
         var total = sales.Sum(s => s.TotalAmount);
@@ -93,7 +91,7 @@ public sealed class ReportService(IApplicationDbContext db, StoreCalendar calend
                 Sku = g.Max(i => i.Sku),
                 ProductName = g.Max(i => i.ProductName),
                 QuantitySold = g.Sum(i => i.Quantity),
-                Revenue = g.Sum(i => i.LineTotal - i.TaxAmount),
+                Revenue = g.Sum(i => i.LineTotal),
                 Cost = g.Sum(i => i.UnitCost * i.Quantity)
             })
             .ToListAsync(cancellationToken);

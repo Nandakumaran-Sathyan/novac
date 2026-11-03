@@ -18,14 +18,11 @@ public class Sale
     public int? CustomerId { get; set; }
     public Customer? Customer { get; set; }
 
-    /// <summary>Total before discounts and tax.</summary>
+    /// <summary>Total before the discount.</summary>
     public decimal Subtotal { get; set; }
     public decimal DiscountPercent { get; set; }
     public decimal DiscountAmount { get; set; }
-    /// <summary>Tax rate in force when the sale was made, so old invoices stay reproducible.</summary>
-    public decimal TaxRatePercent { get; set; }
-    public decimal TaxAmount { get; set; }
-    /// <summary>Final bill amount: subtotal − discount + tax.</summary>
+    /// <summary>Final bill amount: subtotal − discount.</summary>
     public decimal TotalAmount { get; set; }
 
     public PaymentMethod PaymentMethod { get; set; }

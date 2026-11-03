@@ -50,7 +50,6 @@ public sealed record SaleItemDto(
     int Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
-    decimal TaxAmount,
     decimal LineTotal);
 
 public sealed record SaleDto(
@@ -68,8 +67,6 @@ public sealed record SaleDto(
     decimal Subtotal,
     decimal DiscountPercent,
     decimal DiscountAmount,
-    decimal TaxRatePercent,
-    decimal TaxAmount,
     decimal TotalAmount,
     decimal AmountPaid,
     decimal ChangeAmount,
@@ -104,6 +101,5 @@ public sealed record PosSettingsDto(
     string StoreAddress,
     string CurrencyCode,
     string TimeZoneId,
-    decimal TaxRatePercent,
     decimal MaxDiscountPercent,
     decimal LoyaltySpendPerPoint);

@@ -18,7 +18,7 @@ public sealed class ReportsController(IReportService reportService) : Controller
     public Task<DailySalesReport> DailySales([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken cancellationToken) =>
         reportService.GetDailySalesAsync(from, to, cancellationToken);
 
-    /// <summary>Best-selling products by revenue (net of discount and tax).</summary>
+    /// <summary>Best-selling products by revenue (net of discount).</summary>
     [HttpGet("top-products")]
     [ProducesResponseType<IReadOnlyList<TopProductRow>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

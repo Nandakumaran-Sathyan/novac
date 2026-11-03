@@ -54,7 +54,6 @@ export class Pos implements OnInit {
   protected readonly checkoutError = signal<string | null>(null);
   protected readonly completedSale = signal<Sale | null>(null);
 
-  protected readonly taxRate = computed(() => this.settings.settings()?.taxRatePercent ?? 0);
   protected readonly spendPerPoint = computed(() => this.settings.settings()?.loyaltySpendPerPoint ?? 0);
   /** Same rule as the server (LoyaltyRules): floor(total / spend per point), customers only. */
   protected readonly pointsToEarn = computed(() => {
@@ -67,7 +66,7 @@ export class Pos implements OnInit {
     return !Number.isFinite(d) || d < 0 || d > this.maxDiscount();
   });
   protected readonly totals = computed(() =>
-    calculateTotals(this.lines(), this.discountInvalid() ? 0 : this.discountPercent(), this.taxRate()),
+    calculateTotals(this.lines(), this.discountInvalid() ? 0 : this.discountPercent()),
   );
   protected readonly itemCount = computed(() => this.lines().reduce((n, l) => n + l.quantity, 0));
   /** Cash tendered below the total can't be accepted; leaving the box empty means exact payment. */

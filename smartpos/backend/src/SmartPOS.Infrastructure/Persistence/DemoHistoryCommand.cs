@@ -54,7 +54,7 @@ public sealed class DemoHistoryCommand(
 
         var existingPhones = (await db.Customers.IgnoreQueryFilters().Where(c => c.ShopId == shopId).Select(c => c.Phone)
             .ToListAsync(cancellationToken)).ToHashSet();
-        var history = DemoHistory.Generate(shopId, user.Id, target, calendar, cutoff, posOptions.Value.TaxRatePercent,
+        var history = DemoHistory.Generate(shopId, user.Id, target, calendar, cutoff,
             posOptions.Value.MaxDiscountPercent, Math.Clamp(days, 1, 365),
             loyaltyOptions.Value.SpendPerPoint, existingPhones);
 

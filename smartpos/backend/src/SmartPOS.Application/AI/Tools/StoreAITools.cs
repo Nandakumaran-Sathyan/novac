@@ -41,8 +41,8 @@ public sealed class StoreAITools(
         var (from, to) = StorePeriods.Resolve(period, calendar.Today);
         var report = await reports.GetDailySalesAsync(from, to, cancellationToken);
         return new SalesSummaryResult(StorePeriods.NameOf(period), from, to, Currency,
-            Money(report.Total), report.TransactionCount, Money(report.AverageSale), Money(report.Days.Sum(d => d.TaxAmount)),
-            "Completed bills only. TotalSales is what customers paid (after discounts, including tax).");
+            Money(report.Total), report.TransactionCount, Money(report.AverageSale),
+            "Completed bills only. TotalSales is what customers paid (after discounts).");
     }
 
     /// <summary>Reuses the Reports page's top-products query.</summary>
@@ -54,7 +54,7 @@ public sealed class StoreAITools(
             rows.Select(r => new ProductSalesRow(r.ProductName, r.Sku, r.QuantitySold, Money(r.Revenue), Money(r.GrossProfit))).ToList(),
             rows.Count == 0
                 ? "No products were sold in this period."
-                : "NetSales is after discounts and excludes tax. GrossProfit is NetSales minus the cost recorded at the time of each sale.");
+                : "NetSales is after discounts. GrossProfit is NetSales minus the cost recorded at the time of each sale.");
     }
 
     /// <summary>Reuses the Inventory page's "Low" filter (at or below the low-stock level, most urgent first).</summary>
@@ -101,7 +101,7 @@ public sealed class StoreAITools(
         var atCost = stock.Sum(s => s.StockQuantity * s.CostPrice);
         var atPrice = stock.Sum(s => s.StockQuantity * s.Price);
         return new InventoryValueResult(Currency, Money(atCost), Money(atPrice), Money(atPrice - atCost), stock.Count, stock.Sum(s => s.StockQuantity),
-            "Active products with stock on hand, valued at today's cost price and selling price (not batch-by-batch costing). Selling-price value excludes tax.");
+            "Active products with stock on hand, valued at today's cost price and selling price (not batch-by-batch costing).");
     }
 
     public async Task<UnsoldProductsResult> GetUnsoldProductsAsync(int days, int limit, CancellationToken cancellationToken)

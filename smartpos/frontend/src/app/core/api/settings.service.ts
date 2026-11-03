@@ -5,7 +5,7 @@ import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { PosSettings } from '../models';
 
-/** Store/POS settings for the signed-in user (currency, tax rate, discount limit). */
+/** Store/POS settings for the signed-in user (currency, discount limit, loyalty rate). */
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
   private readonly http = inject(HttpClient);

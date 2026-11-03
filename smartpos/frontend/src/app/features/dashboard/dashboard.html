@@ -87,7 +87,7 @@
             <section class="card chart-card" style="--i:0" aria-labelledby="trend-heading">
               <div class="card-header"><h2 id="trend-heading">Revenue over time</h2></div>
               <div class="card-body">
-                <p class="caption">Daily bill totals (tax included) against the same days of the previous period.</p>
+                <p class="caption">Daily bill totals against the same days of the previous period.</p>
                 <app-area-chart [points]="dailyPoints()" [valueFormat]="money" [seriesName]="'Last ' + i.days + ' days'"
                                 [previousName]="'Previous ' + i.days + ' days'" [ariaLabel]="'Daily revenue for the last ' + i.days + ' days'" />
               </div>
@@ -110,7 +110,7 @@
             <section class="card chart-card" style="--i:2" aria-labelledby="cat-heading">
               <div class="card-header"><h2 id="cat-heading">Sales by category</h2></div>
               <div class="card-body">
-                <p class="caption">Net sales: after discount, before tax.</p>
+                <p class="caption">Net sales, after discount.</p>
                 <app-hbar-chart [rows]="categoryRows()" [valueFormat]="moneyWhole" ariaLabel="Net sales by category" />
               </div>
             </section>

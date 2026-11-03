@@ -7,17 +7,14 @@ public sealed record SaleLineInput(decimal UnitPrice, int Quantity);
 
 /// <summary>
 /// Per-line lists run in the same order as the input lines. A line's total is its subtotal (unit
-/// price × quantity) minus its share of the discount plus its share of the tax, and the line totals
-/// add up to exactly <see cref="Total"/>.
+/// price × quantity) minus its share of the discount, and the line totals add up to exactly <see cref="Total"/>.
 /// </summary>
 public sealed record SaleTotals(
     IReadOnlyList<decimal> LineSubtotals,
     IReadOnlyList<decimal> LineDiscounts,
-    IReadOnlyList<decimal> LineTaxes,
     IReadOnlyList<decimal> LineTotals,
     decimal Subtotal,
     decimal DiscountAmount,
-    decimal TaxAmount,
     decimal Total);
 
 /// <summary>
@@ -27,9 +24,8 @@ public sealed record SaleTotals(
 /// <item>Line subtotal = unit price × quantity, rounded to 2 dp.</item>
 /// <item>Subtotal = sum of line subtotals.</item>
 /// <item>Discount = subtotal × discount% (sale-level), rounded.</item>
-/// <item>Tax = (subtotal − discount) × tax%, rounded.</item>
-/// <item>Total = subtotal − discount + tax.</item>
-/// <item>The discount and tax are then split across lines in proportion to their value, to the cent
+/// <item>Total = subtotal − discount. No tax is charged.</item>
+/// <item>The discount is then split across lines in proportion to their value, to the cent
 /// (largest remainder), so the lines always add up to exactly the sale figures.</item>
 /// </list>
 /// Rounding is half away from zero, which matches what customers expect on a receipt.
@@ -39,14 +35,12 @@ public static class SaleCalculator
     /// <summary>Largest amount the DECIMAL(12,2) money columns can hold.</summary>
     public const decimal MaxAmount = 9_999_999_999.99m;
 
-    public static SaleTotals Calculate(IReadOnlyList<SaleLineInput> lines, decimal discountPercent, decimal taxRatePercent)
+    public static SaleTotals Calculate(IReadOnlyList<SaleLineInput> lines, decimal discountPercent)
     {
         if (lines.Count == 0)
             throw new BusinessRuleException("A sale must contain at least one item.");
         if (discountPercent is < 0 or > 100)
             throw new BusinessRuleException("Discount must be between 0 and 100 percent.");
-        if (taxRatePercent is < 0 or > 100)
-            throw new BusinessRuleException("Tax rate must be between 0 and 100 percent.");
 
         var lineSubtotals = new List<decimal>(lines.Count);
         foreach (var line in lines)
@@ -62,14 +56,11 @@ public static class SaleCalculator
         if (subtotal > MaxAmount)
             throw new BusinessRuleException("This sale is too large to record.");
         var discount = Round(subtotal * discountPercent / 100m);
-        var tax = Round((subtotal - discount) * taxRatePercent / 100m);
 
         var lineDiscounts = Allocate(discount, lineSubtotals);
-        var taxable = lineSubtotals.Select((value, i) => value - lineDiscounts[i]).ToList();
-        var lineTaxes = Allocate(tax, taxable);
-        var lineTotals = taxable.Select((value, i) => value + lineTaxes[i]).ToList();
+        var lineTotals = lineSubtotals.Select((value, i) => value - lineDiscounts[i]).ToList();
 
-        return new SaleTotals(lineSubtotals, lineDiscounts, lineTaxes, lineTotals, subtotal, discount, tax, subtotal - discount + tax);
+        return new SaleTotals(lineSubtotals, lineDiscounts, lineTotals, subtotal, discount, subtotal - discount);
     }
 
     /// <summary>

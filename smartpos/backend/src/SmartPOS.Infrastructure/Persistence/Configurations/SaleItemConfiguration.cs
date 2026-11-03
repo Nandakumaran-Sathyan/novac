@@ -20,7 +20,6 @@ public sealed class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
         builder.Property(i => i.UnitPrice).HasPrecision(12, 2);
         builder.Property(i => i.UnitCost).HasPrecision(12, 2);
         builder.Property(i => i.DiscountAmount).HasPrecision(12, 2);
-        builder.Property(i => i.TaxAmount).HasPrecision(12, 2);
         builder.Property(i => i.LineTotal).HasPrecision(12, 2);
 
         // Restrict: a product with sales history can never be deleted, only deactivated.

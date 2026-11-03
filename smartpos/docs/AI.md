@@ -151,7 +151,7 @@ filter, and dates come from a named period worked out by the server in the store
 
 | Tool | Arguments (defaults) | Source |
 |---|---|---|
-| GetTodaySales / GetYesterdaySales | none | The Reports page's daily-sales query: total paid, bills, average bill, tax. |
+| GetTodaySales / GetYesterdaySales | none | The Reports page's daily-sales query: total paid, bills, average bill. |
 | GetTopSellingProducts | period (last30days), limit 1-20 (5), rankBy units or revenue (units) | The Reports page's top-products query. |
 | GetMostProfitableProducts | period (last30days), limit 1-20 (5) | Same query, ranked by gross profit (net sales minus the cost recorded at sale time). |
 | GetLowStockProducts | limit 1-50 (20) | The Inventory page's "Low" filter. |

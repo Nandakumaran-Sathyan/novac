@@ -6,7 +6,7 @@ namespace SmartPOS.Application.AI.Tools;
 
 public sealed record SalesSummaryResult(
     string Period, DateOnly From, DateOnly To, string Currency,
-    decimal TotalSales, int Bills, decimal AverageBill, decimal TaxCollected, string Note);
+    decimal TotalSales, int Bills, decimal AverageBill, string Note);
 
 public sealed record ProductSalesRow(string Name, string Sku, int UnitsSold, decimal NetSales, decimal GrossProfit);
 

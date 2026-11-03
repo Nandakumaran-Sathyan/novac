@@ -22,7 +22,7 @@ public class StoreToolRegistryTests
         }
 
         public Task<SalesSummaryResult> GetSalesSummaryAsync(StorePeriod period, CancellationToken ct) =>
-            Task.FromResult(Record($"sales:{period}", new SalesSummaryResult("x", default, default, "INR", 100m, 2, 50m, 5m, "n")));
+            Task.FromResult(Record($"sales:{period}", new SalesSummaryResult("x", default, default, "INR", 100m, 2, 50m, "n")));
         public Task<TopProductsResult> GetTopProductsAsync(StorePeriod period, int limit, TopProductSort rankBy, CancellationToken ct) =>
             Task.FromResult(Record($"top:{period}:{limit}:{rankBy}", new TopProductsResult("x", default, default, "INR", "units", [], "n")));
         public Task<LowStockResult> GetLowStockProductsAsync(int limit, CancellationToken ct) =>
