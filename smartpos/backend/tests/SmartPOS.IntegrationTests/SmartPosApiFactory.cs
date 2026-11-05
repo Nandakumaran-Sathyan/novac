@@ -12,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Collections.Concurrent;
 using SmartPOS.Application.AI;
 using SmartPOS.Application.Auth;
+using SmartPOS.Application.Forecasting;
+using SmartPOS.Infrastructure.Forecasting;
 using SmartPOS.Core.Entities;
 using SmartPOS.Infrastructure.Persistence;
 
@@ -83,6 +85,24 @@ public sealed class FakeChatModelClient : IChatModelClient
     public Task<ChatModelStatus> GetStatusAsync(CancellationToken cancellationToken) => Task.FromResult(Status);
 }
 
+/// <summary>Stands in for the Python forecasting service: records each request and returns a scripted answer.</summary>
+public sealed class FakeForecastingHandler : HttpMessageHandler
+{
+    public ConcurrentQueue<(HttpMethod Method, string PathAndQuery, string? Key, string? Body)> Requests { get; } = new();
+    public Func<HttpRequestMessage, HttpResponseMessage>? Respond { get; set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+        Requests.Enqueue((request.Method, request.RequestUri!.PathAndQuery,
+            request.Headers.TryGetValues("X-Service-Key", out var key) ? key.First() : null, body));
+        return Respond?.Invoke(request) ?? Json(System.Net.HttpStatusCode.OK, """{"status":"ok"}""");
+    }
+
+    public static HttpResponseMessage Json(System.Net.HttpStatusCode status, string json) =>
+        new(status) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+}
+
 /// <summary>
 /// Runs the real API pipeline (auth, validation, controllers, services, EF Core) in memory.
 /// SQLite in-memory replaces MySQL so the tests need no database server; MySQL-specific behaviour
@@ -104,6 +124,8 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
 
     public FakeEmailSender Mail { get; } = new();
     public FakeChatModelClient Model { get; } = new();
+    public FakeForecastingHandler Forecasting { get; } = new();
+    public const string ForecastingKey = "integration-forecasting-key-0123456789abcdef";
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
@@ -117,6 +139,7 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("RateLimiting:LoginPermitsPerMinute", "1000");
         builder.UseSetting("Assistant:RequestsPerMinute", "1000"); // one dedicated test lowers it
         builder.UseSetting("Pos:MaxDiscountPercent", "50");
+        builder.UseSetting("Forecasting:ServiceKey", ForecastingKey);
         builder.UseSetting("App:WebBaseUrl", "https://pos.test");
 
         builder.ConfigureServices(services =>
@@ -132,6 +155,7 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<IChatModelClient>();
             services.AddSingleton(Model);
             services.AddSingleton<IChatModelClient>(Model);
+            services.AddHttpClient<IForecastingClient, ForecastingClient>().ConfigurePrimaryHttpMessageHandler(() => Forecasting);
         });
     }
 

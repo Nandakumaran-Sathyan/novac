@@ -16,6 +16,8 @@ public sealed record ProductDto(
     int LowStockThreshold,
     bool IsLowStock,
     DateOnly? ExpiryDate,
+    int LeadTimeDays,
+    int MinimumOrderQuantity,
     bool IsActive,
     DateTime CreatedAt,
     DateTime UpdatedAt);
@@ -57,6 +59,14 @@ public abstract class ProductRequestBase
     public int LowStockThreshold { get; init; } = 20;
 
     public DateOnly? ExpiryDate { get; init; }
+
+    /// <summary>Days from ordering to delivery (1-90). Forecasting uses it to time reorders.</summary>
+    [Range(1, 90)]
+    public int LeadTimeDays { get; init; } = 3;
+
+    /// <summary>The supplier's minimum order (case size); reorder suggestions are rounded up to it.</summary>
+    [Range(1, 10_000)]
+    public int MinimumOrderQuantity { get; init; } = 1;
 }
 
 public sealed class CreateProductRequest : ProductRequestBase

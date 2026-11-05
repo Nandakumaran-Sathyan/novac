@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartPOS.Application.AI;
 using SmartPOS.Application.Common;
+using SmartPOS.Application.Forecasting;
 
 namespace SmartPOS.API.Infrastructure;
 
@@ -26,12 +27,13 @@ public sealed class GlobalExceptionHandler(
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message),
             TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Too many requests", exception.Message),
             AIUnavailableException => (StatusCodes.Status503ServiceUnavailable, "AI assistant unavailable", exception.Message),
+            ForecastingUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Forecasting unavailable", exception.Message),
             // Typically a unique index or FK violation that slipped past a pre-check because of a race.
             DbUpdateException => (StatusCodes.Status409Conflict, "Conflict", "The change conflicts with existing data. Reload and try again."),
             _ => (StatusCodes.Status500InternalServerError, "Server error", "An unexpected error occurred.")
         };
 
-        if (exception is AIUnavailableException)
+        if (exception is AIUnavailableException or ForecastingUnavailableException)
             logger.LogWarning("AI unavailable for {Method} {Path}: {Message}", httpContext.Request.Method, httpContext.Request.Path, exception.Message);
         else if (status >= 500)
             logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);

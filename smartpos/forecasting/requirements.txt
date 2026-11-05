@@ -1,0 +1,17 @@
+# Novac forecasting service. Python 3.12 (arm64 on Apple Silicon); CPU only, no CUDA.
+# Versions pinned to the ones verified on the development Mac (MacBook Air M4, macOS).
+# LightGBM needs OpenMP on macOS: `brew install libomp`.
+numpy==2.5.4
+pandas==3.1.1
+scikit-learn==1.9.1
+lightgbm==4.7.0
+joblib==1.5.2
+SQLAlchemy==2.1.8
+psycopg[binary]==3.3.8
+alembic==1.20.1
+fastapi==0.162.0
+uvicorn==0.40.0
+pydantic==2.13.4
+pydantic-settings==2.12.0
+pytest==9.0.2
+httpx==0.28.1

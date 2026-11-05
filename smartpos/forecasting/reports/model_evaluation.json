@@ -1,0 +1,196 @@
+{
+  "model_version": "lgbm-20261104-9591d4d6",
+  "artifact": "/Users/nandakumaransathyan/Projects/novac/smartpos/forecasting/artifacts/lgbm-20261104-9591d4d6.joblib",
+  "objective": "tweedie_1.2",
+  "trees": 546,
+  "splits": {
+    "train": [
+      "2024-10-21",
+      "2026-05-01"
+    ],
+    "validation": [
+      "2026-05-02",
+      "2026-08-20"
+    ],
+    "test": [
+      "2026-08-21",
+      "2026-11-04"
+    ]
+  },
+  "rows": {
+    "train": 560490,
+    "validation": 112840,
+    "test": 78910
+  },
+  "validation_selection": {
+    "poisson": {
+      "mae": 3.7041603093269586,
+      "rmse": 6.905232536957758,
+      "wape": 0.40909487245321924,
+      "bias": -0.0048121709632419,
+      "n_obs": 110497,
+      "best_iteration": 697
+    },
+    "tweedie_1.2": {
+      "mae": 3.6945435288924253,
+      "rmse": 6.90868154333372,
+      "wape": 0.4080327759895835,
+      "bias": -0.008861560228466688,
+      "n_obs": 110497,
+      "best_iteration": 546
+    },
+    "l2": {
+      "mae": 3.7366608800171663,
+      "rmse": 6.975081802593053,
+      "wape": 0.412684300477619,
+      "bias": -0.001770742957699124,
+      "n_obs": 110497,
+      "best_iteration": 323
+    }
+  },
+  "overall": {
+    "test/latent_demand/lightgbm": {
+      "mae": 3.5114,
+      "rmse": 6.2219,
+      "wape": 0.4175,
+      "bias": -0.0147,
+      "n": 78910
+    },
+    "test/units_sold/lightgbm": {
+      "mae": 3.4438,
+      "rmse": 6.0489,
+      "wape": 0.418,
+      "bias": -0.0055,
+      "n": 77064
+    },
+    "test/latent_demand/moving_average_7": {
+      "mae": 3.8523,
+      "rmse": 6.9274,
+      "wape": 0.4581,
+      "bias": -0.0162,
+      "n": 78910
+    },
+    "test/units_sold/moving_average_7": {
+      "mae": 3.774,
+      "rmse": 6.7169,
+      "wape": 0.4581,
+      "bias": -0.0082,
+      "n": 77064
+    },
+    "test/latent_demand/same_day_last_week": {
+      "mae": 4.8616,
+      "rmse": 8.7448,
+      "wape": 0.5781,
+      "bias": -0.0202,
+      "n": 78910
+    },
+    "test/units_sold/same_day_last_week": {
+      "mae": 4.7749,
+      "rmse": 8.5476,
+      "wape": 0.5796,
+      "bias": -0.0097,
+      "n": 77064
+    },
+    "backtest/latent_demand/lightgbm": {
+      "mae": 3.523,
+      "rmse": 6.3069,
+      "wape": 0.4233,
+      "bias": -0.0325,
+      "n": 72750
+    },
+    "backtest/units_sold/lightgbm": {
+      "mae": 3.4479,
+      "rmse": 6.1092,
+      "wape": 0.423,
+      "bias": -0.0223,
+      "n": 71052
+    },
+    "backtest/latent_demand/moving_average_7": {
+      "mae": 3.8661,
+      "rmse": 6.9603,
+      "wape": 0.4645,
+      "bias": -0.0089,
+      "n": 72750
+    },
+    "backtest/units_sold/moving_average_7": {
+      "mae": 3.7884,
+      "rmse": 6.7525,
+      "wape": 0.4648,
+      "bias": 0.0012,
+      "n": 71052
+    },
+    "backtest/latent_demand/same_day_last_week": {
+      "mae": 4.8424,
+      "rmse": 8.7048,
+      "wape": 0.5819,
+      "bias": -0.0089,
+      "n": 72750
+    },
+    "backtest/units_sold/same_day_last_week": {
+      "mae": 4.7577,
+      "rmse": 8.5069,
+      "wape": 0.5837,
+      "bias": 0.0017,
+      "n": 71052
+    }
+  },
+  "backtest_wape_by_horizon_latent": {
+    "lightgbm": {
+      "1": 0.4219,
+      "2": 0.4095,
+      "3": 0.4085,
+      "4": 0.4441,
+      "5": 0.4294,
+      "6": 0.43,
+      "7": 0.4285
+    },
+    "moving_average_7": {
+      "1": 0.4445,
+      "2": 0.442,
+      "3": 0.4418,
+      "4": 0.5002,
+      "5": 0.4888,
+      "6": 0.4803,
+      "7": 0.4705
+    },
+    "same_day_last_week": {
+      "1": 0.5711,
+      "2": 0.5664,
+      "3": 0.5686,
+      "4": 0.6189,
+      "5": 0.5914,
+      "6": 0.5827,
+      "7": 0.5841
+    }
+  },
+  "backtest_origins": [
+    "2026-08-20",
+    "2026-08-27",
+    "2026-09-03",
+    "2026-09-10",
+    "2026-09-17",
+    "2026-09-24",
+    "2026-10-01",
+    "2026-10-08",
+    "2026-10-15",
+    "2026-10-22"
+  ],
+  "top_features_by_gain": {
+    "rolling_mean_28": 22406819.0,
+    "rolling_mean_14": 8007935.0,
+    "rolling_mean_7": 1393311.0,
+    "product_id": 445251.0,
+    "day_of_week": 394187.0,
+    "store_id": 131625.0,
+    "discount_percentage": 127385.0,
+    "price_change": 76684.0,
+    "lag_1": 66516.0,
+    "festival": 64622.0,
+    "lag_28": 56003.0,
+    "lag_7": 52828.0,
+    "lag_14": 49617.0,
+    "week_of_year": 45840.0,
+    "promotion_flag": 42569.0
+  },
+  "seconds": 44.1
+}

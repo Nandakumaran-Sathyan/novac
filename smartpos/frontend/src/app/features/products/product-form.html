@@ -95,6 +95,20 @@
             <span class="hint">Optional, for perishable goods.</span>
           </div>
 
+          <div class="field">
+            <label for="leadTimeDays" class="required">Supplier lead time (days)</label>
+            <input id="leadTimeDays" type="number" inputmode="numeric" min="1" max="90" step="1" class="input" formControlName="leadTimeDays" [attr.aria-invalid]="invalid('leadTimeDays')" aria-describedby="lead-help">
+            @if (invalid('leadTimeDays')) { <span class="field-error">Enter a whole number of days from 1 to 90.</span> }
+            @else { <span id="lead-help" class="hint">Days from placing an order to receiving it. Forecasting uses it to time reorders.</span> }
+          </div>
+
+          <div class="field">
+            <label for="minimumOrderQuantity" class="required">Minimum order quantity</label>
+            <input id="minimumOrderQuantity" type="number" inputmode="numeric" min="1" step="1" class="input" formControlName="minimumOrderQuantity" [attr.aria-invalid]="invalid('minimumOrderQuantity')" aria-describedby="moq-help">
+            @if (invalid('minimumOrderQuantity')) { <span class="field-error">Enter a whole number from 1 to 10,000.</span> }
+            @else { <span id="moq-help" class="hint">The supplier's case size. Suggested orders are rounded up to a multiple of it.</span> }
+          </div>
+
           <div class="field span-2">
             <label for="description">Description</label>
             <textarea id="description" class="textarea" formControlName="description" rows="3"></textarea>

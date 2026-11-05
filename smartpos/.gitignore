@@ -26,3 +26,12 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---- Python (forecasting service) ----
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+forecasting/artifacts/*.joblib
+forecasting/logs/
+backend/api.log

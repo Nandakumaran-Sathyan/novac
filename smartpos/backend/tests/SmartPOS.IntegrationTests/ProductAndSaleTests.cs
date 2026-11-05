@@ -54,6 +54,36 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
     }
 
     [Fact]
+    public async Task Lead_time_and_minimum_order_default_save_and_are_validated()
+    {
+        var user = await factory.UserClientAsync();
+        var product = await CreateProductAsync(user, "LEAD-1", 10m, 5);
+        Assert.Equal(3, product.LeadTimeDays);
+        Assert.Equal(1, product.MinimumOrderQuantity);
+
+        var update = await user.PutAsJsonAsync($"/api/products/{product.Id}", new
+        {
+            sku = product.Sku, name = product.Name, category = product.Category,
+            price = 10m, costPrice = 5m, lowStockThreshold = 1, isActive = true,
+            leadTimeDays = 10, minimumOrderQuantity = 12
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var saved = await user.GetFromJsonAsync<ProductDto>($"/api/products/{product.Id}", SmartPosApiFactory.Json);
+        Assert.Equal(10, saved!.LeadTimeDays);
+        Assert.Equal(12, saved.MinimumOrderQuantity);
+
+        var invalid = await user.PostAsJsonAsync("/api/products", new
+        {
+            sku = "LEAD-2", name = "Bad lead time", category = "Test Category", price = 1, costPrice = 1,
+            leadTimeDays = 0, minimumOrderQuantity = 0
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        var body = await invalid.Content.ReadAsStringAsync();
+        Assert.Contains("LeadTimeDays", body);
+        Assert.Contains("MinimumOrderQuantity", body);
+    }
+
+    [Fact]
     public async Task Product_search_and_pagination_work()
     {
         var user = await factory.UserClientAsync();

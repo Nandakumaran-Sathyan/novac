@@ -1,0 +1,222 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Demand forecasting <span class="badge badge-info beta" title="This feature is in beta">Beta</span></h1>
+      <p>
+        @if (run(); as r) {
+          Next 7 days for your shop, from {{ r.trading_days }} days of sales up to {{ r.as_of_date | date: 'd MMM' }} · updated {{ r.generated_at | date: 'd MMM, h:mm a' }}
+        } @else {
+          7-day demand, stockout risk and reorder suggestions for your shop, learned from its own sales.
+        }
+      </p>
+      <p class="beta-note"><app-icon name="alert" [size]="14" /> Beta: forecasts improve as more sales are recorded. Use them as a guide and check before ordering.</p>
+    </div>
+    @if (status()?.model_version) {
+      <div class="page-actions">
+        <button type="button" class="btn btn-secondary btn-icon" (click)="loadAll()" [disabled]="loading()" aria-label="Refresh" title="Refresh"><app-icon name="refresh" [size]="16" /></button>
+        <button type="button" class="btn btn-primary" (click)="generate()" [disabled]="generating()">
+          <app-icon name="trend" [size]="16" /> {{ generating() ? 'Updating…' : (hasForecast() ? 'Update forecast' : 'Create forecast') }}
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (error()) {
+    <app-error-alert [message]="error()!" (retry)="loadAll()" />
+  }
+
+  @if (loading() && !forecast()) {
+    <app-loading label="Loading forecasts…" />
+  } @else if (status() && !status()!.model_version) {
+    <section class="card">
+      <app-empty-state icon="trend" title="Forecasting is being set up" message="No forecasting model is ready yet. Check back later." />
+    </section>
+  } @else if (status() && !hasForecast()) {
+    <section class="card">
+      <app-empty-state icon="trend" title="No forecast for your shop yet"
+                       message="Create one from your recorded sales. You need at least a week of sales.">
+        <button type="button" class="btn btn-primary" (click)="generate()" [disabled]="generating()">
+          {{ generating() ? 'Creating…' : 'Create forecast' }}
+        </button>
+      </app-empty-state>
+    </section>
+  } @else if (forecast()) {
+    <section class="stats-grid" aria-label="Overview">
+      <app-stat-card [label]="day() ? 'Demand, selected day' : 'Demand, next 7 days'" [value]="units(demand())" icon="trend"
+                     [hint]="items().length === 1 ? '1 product' : items().length + ' products'" />
+      <app-stat-card label="High-risk products" [value]="risk().HIGH" icon="warning" [tone]="risk().HIGH > 0 ? 'warning' : 'default'"
+                     [hint]="risk().MEDIUM + ' medium · ' + risk().LOW + ' low'" />
+      <app-stat-card label="Products to reorder" [value]="toReorder()" icon="package" hint="Reorder point reached" />
+      <app-stat-card label="Forecast accuracy" [value]="accuracyScore().model !== null ? (accuracyScore().model | percent: '1.0-0')! : '—'" icon="chart"
+                     [hint]="accuracyScore().baseline !== null ? '7-day average: ' + (accuracyScore().baseline | percent: '1.0-0') : 'Not measured yet'" />
+    </section>
+
+    <section class="card workspace">
+      <div class="ws-head">
+        <div class="tabs" role="tablist" aria-label="Forecast views" (keydown)="onTabKey($event)">
+          @for (t of tabs; track t) {
+            <button type="button" role="tab" [id]="'tab-' + t" [attr.aria-selected]="tab() === t" [attr.aria-controls]="'panel-' + t"
+                    [tabIndex]="tab() === t ? 0 : -1" (click)="tab.set(t)">
+              @if (t === 'alerts') { <span class="long">Stockout alerts</span><span class="short">Alerts</span> }
+              @else { {{ t === 'demand' ? 'Demand' : t === 'products' ? 'Products' : 'Orders' }} }
+              @if (tabCounts()[t] !== null) {
+                <span class="count" [class.count-warn]="t === 'alerts' && tabCounts()[t]! > 0">{{ tabCounts()[t] }}</span>
+              }
+            </button>
+          }
+        </div>
+        <div class="ws-filters" role="search" aria-label="Filter products">
+          <select class="select" aria-label="Category" [value]="category() ?? ''" (change)="category.set($any($event.target).value || null)">
+            <option value="">All categories</option>
+            @for (c of categories(); track c) { <option [value]="c">{{ c }}</option> }
+          </select>
+          <input type="search" class="input" aria-label="Product" placeholder="Search name or SKU" [value]="productSearch()"
+                 (input)="productSearch.set($any($event.target).value)">
+          @if (tab() === 'demand' || tab() === 'products') {
+            <select class="select" aria-label="Forecast date" [value]="day() ?? ''" (change)="selectDay($any($event.target).value)">
+              <option value="">All 7 days</option>
+              @for (d of days(); track d) { <option [value]="d">{{ d | date: 'EEE d MMM' }}</option> }
+            </select>
+          }
+          @if (filtered()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">Clear</button>
+          }
+        </div>
+      </div>
+
+      @switch (tab()) {
+        @case ('demand') {
+          <div class="panel" role="tabpanel" id="panel-demand" aria-labelledby="tab-demand">
+            <div class="chart-grid">
+              <div>
+                <h2 class="panel-title">Units per day</h2>
+                <app-area-chart [points]="demandPoints()" [valueFormat]="unitFormat" seriesName="Forecast" ariaLabel="Predicted demand per day" [height]="220" />
+              </div>
+              <div>
+                <h2 class="panel-title">By category <span class="muted">· {{ day() ? 'selected day' : '7 days' }}</span></h2>
+                @if (categoryRows().length) {
+                  <app-hbar-chart [rows]="categoryRows()" [valueFormat]="unitFormat" ariaLabel="Forecast demand by category" />
+                } @else {
+                  <app-empty-state icon="package" title="No products match" message="Change or clear the filters." />
+                }
+              </div>
+            </div>
+            @if (accuracy().shop; as s) {
+              <p class="foot">
+                Accuracy: on recent days the model did not learn from, forecasts for your shop were off by {{ s.wape | percent: '1.0-0' }} of actual sales
+                @if (accuracy().shopBaseline?.wape != null) {(a simple 7-day average: {{ accuracy().shopBaseline!.wape | percent: '1.0-0' }})}@if (accuracy().overall; as o) {; across all shops {{ o.wape | percent: '1.0-0' }}}.
+                Out-of-stock days are left out, because their sales understate demand.
+              </p>
+            }
+          </div>
+        }
+
+        @case ('products') {
+          <div class="panel flush" role="tabpanel" id="panel-products" aria-labelledby="tab-products">
+            @if (items().length === 0) {
+              <app-empty-state icon="package" title="No products match" message="Change or clear the filters." />
+            } @else {
+              <div class="table-wrap scroll">
+                <table class="table compact sticky">
+                  <thead>
+                    <tr>
+                      <th scope="col">Product</th>
+                      @for (d of days(); track d) { <th scope="col" class="num" [class.hl]="d === day()">{{ d | date: 'EEE d' }}</th> }
+                      <th scope="col" class="num">7 days</th>
+                      <th scope="col" class="num">Stock</th>
+                      <th scope="col">Risk</th>
+                      <th scope="col">Runs out</th>
+                      <th scope="col" class="num">Reorder</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of items(); track p.product_id) {
+                      <tr>
+                        <td>
+                          <div class="cell-title">{{ p.product_name }}</div>
+                          <div class="cell-sub">{{ p.category }} · <span class="mono">{{ p.sku }}</span>@if (p.method !== 'lightgbm') { · <span title="Too little sales history for the model; based on recent averages">estimate</span> }</div>
+                        </td>
+                        @for (d of days(); track d) { <td class="num" [class.hl]="d === day()">{{ dayValue(p, d) | number: '1.0-1' }}</td> }
+                        <td class="num"><strong>{{ p.cumulative_predicted_demand | number: '1.0-0' }}</strong></td>
+                        <td class="num">{{ p.current_stock }}</td>
+                        <td><span class="badge" [class]="riskBadge[p.stockout_risk]">{{ p.stockout_risk }}</span></td>
+                        <td class="nowrap">{{ p.predicted_stockout_date ? (p.predicted_stockout_date | date: 'EEE d MMM') : '—' }}</td>
+                        <td class="num">{{ p.recommended_reorder_quantity || '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('alerts') {
+          <div class="panel flush" role="tabpanel" id="panel-alerts" aria-labelledby="tab-alerts">
+            <div class="panel-bar">
+              <div class="segmented" role="group" aria-label="Risk">
+                @for (r of ['ALL', 'HIGH', 'MEDIUM', 'LOW']; track r) {
+                  <button type="button" [attr.aria-pressed]="alertRisk() === r" (click)="alertRisk.set($any(r))">{{ r === 'ALL' ? 'High + medium' : r }}</button>
+                }
+              </div>
+              <span class="muted small">{{ riskNote() }}</span>
+            </div>
+            @if (visibleAlerts().length === 0) {
+              <app-empty-state icon="check" title="No alerts at this level" message="Stock covers the forecast for these products." />
+            } @else {
+              <div class="table-wrap scroll">
+                <table class="table compact sticky">
+                  <thead><tr><th scope="col">Product</th><th scope="col">Risk</th><th scope="col" class="num">Stock</th><th scope="col" class="num">7-day demand</th><th scope="col">Runs out</th><th scope="col">Why</th></tr></thead>
+                  <tbody>
+                    @for (a of visibleAlerts(); track a.product_id) {
+                      <tr>
+                        <td><div class="cell-title">{{ a.product_name }}</div><div class="cell-sub">{{ a.category }}</div></td>
+                        <td><span class="badge" [class]="riskBadge[a.stockout_risk]">{{ a.stockout_risk }}</span></td>
+                        <td class="num">{{ a.current_stock }}</td>
+                        <td class="num">{{ a.cumulative_predicted_demand | number: '1.0-0' }}</td>
+                        <td class="nowrap">{{ a.predicted_stockout_date ? (a.predicted_stockout_date | date: 'EEE d MMM') : '—' }}<div class="cell-sub">lead {{ a.lead_days }} d</div></td>
+                        <td class="reason"><span [title]="a.reason">{{ a.reason }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('orders') {
+          <div class="panel flush" role="tabpanel" id="panel-orders" aria-labelledby="tab-orders">
+            <div class="panel-bar">
+              <span class="muted small">
+                Enough for the supplier lead time plus 7 days and a safety margin, minus stock on hand, rounded up to the minimum order.
+                Set lead time and minimum order on each product's page.
+              </span>
+            </div>
+            @if (visibleReorders().length === 0) {
+              <app-empty-state icon="check" title="Nothing to order" message="Every product shown is above its reorder point." />
+            } @else {
+              <div class="table-wrap scroll">
+                <table class="table compact sticky">
+                  <thead><tr><th scope="col">Product</th><th scope="col" class="num">Order</th><th scope="col" class="num">Stock</th><th scope="col" class="num">Reorder point</th><th scope="col">Order by</th><th scope="col">Why</th></tr></thead>
+                  <tbody>
+                    @for (r of visibleReorders(); track r.product_id) {
+                      <tr>
+                        <td><div class="cell-title">{{ r.product_name }}</div><div class="cell-sub">min. order {{ r.minimum_order_quantity }} · lead {{ r.lead_days }} d</div></td>
+                        <td class="num"><strong>{{ r.recommended_reorder_quantity }}</strong></td>
+                        <td class="num">{{ r.current_stock }}</td>
+                        <td class="num">{{ r.reorder_point | number: '1.0-0' }}</td>
+                        <td class="nowrap">{{ r.order_by_date ? (r.order_by_date | date: 'EEE d MMM') : '—' }}</td>
+                        <td class="reason"><span [title]="r.reason">{{ r.reason }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+      }
+    </section>
+  }
+</div>

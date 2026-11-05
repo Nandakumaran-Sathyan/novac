@@ -5,7 +5,9 @@ using SmartPOS.Application.Auth;
 using SmartPOS.Application.Common;
 using SmartPOS.Application.AI;
 using SmartPOS.Infrastructure.AI;
+using SmartPOS.Application.Forecasting;
 using SmartPOS.Infrastructure.Email;
+using SmartPOS.Infrastructure.Forecasting;
 using SmartPOS.Infrastructure.Persistence;
 using SmartPOS.Infrastructure.Security;
 
@@ -60,6 +62,23 @@ public static class DependencyInjection
         services.AddHttpClient<IChatModelClient, OllamaChatClient>((sp, http) =>
         {
             var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
+            http.BaseAddress = new Uri(o.BaseUrl.TrimEnd('/') + "/");
+            http.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+        });
+        // Forecasting service (Python, this machine). Optional: without a service key the endpoints answer 503.
+        services.AddOptions<ForecastingOptions>()
+            .Bind(configuration.GetSection(ForecastingOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out var u) && u.Scheme is "http" or "https",
+                "Forecasting:BaseUrl must be an absolute http(s) URL.")
+            .Validate(o => o.AllowRemoteHost || IsLoopback(o.BaseUrl),
+                "Forecasting:BaseUrl must point at this machine (localhost) unless Forecasting:AllowRemoteHost is set.")
+            .Validate(o => string.IsNullOrEmpty(o.ServiceKey) || o.ServiceKey.Length >= 32,
+                "Forecasting:ServiceKey must be at least 32 characters.")
+            .ValidateOnStart();
+        services.AddHttpClient<IForecastingClient, ForecastingClient>((sp, http) =>
+        {
+            var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ForecastingOptions>>().Value;
             http.BaseAddress = new Uri(o.BaseUrl.TrimEnd('/') + "/");
             http.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
         });

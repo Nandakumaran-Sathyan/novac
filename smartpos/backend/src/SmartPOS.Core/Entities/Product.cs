@@ -19,6 +19,10 @@ public class Product
     public decimal CostPrice { get; set; }
 
     public DateOnly? ExpiryDate { get; set; }
+    /// <summary>Days from ordering to delivery from this product's supplier. Used by forecasting (reorder timing).</summary>
+    public int LeadTimeDays { get; set; } = 3;
+    /// <summary>Smallest quantity the supplier sells (case size). Reorder suggestions are rounded up to a multiple of it.</summary>
+    public int MinimumOrderQuantity { get; set; } = 1;
 
     /// <summary>Inactive products are hidden from the POS but keep their sales history.</summary>
     public bool IsActive { get; set; } = true;

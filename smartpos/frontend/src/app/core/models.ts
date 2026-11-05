@@ -77,6 +77,10 @@ export interface Product {
   isLowStock: boolean;
   /** Calendar date, yyyy-MM-dd. */
   expiryDate: string | null;
+  /** Days from ordering to delivery (used by forecasting). */
+  leadTimeDays: number;
+  /** Supplier's minimum order / case size (used by forecasting). */
+  minimumOrderQuantity: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -92,6 +96,8 @@ export interface ProductInput {
   costPrice: number;
   lowStockThreshold: number;
   expiryDate: string | null;
+  leadTimeDays: number;
+  minimumOrderQuantity: number;
   /** Create only. */
   initialStock?: number;
   /** Update only. */
@@ -324,4 +330,131 @@ export interface AIStatus {
   serverVersion: string | null;
   problem: string | null;
   ready: boolean;
+}
+
+// ---- Forecasting (beta; the signed-in owner's own shop, served by the forecasting service through /api/forecasting) ----
+
+export type StockoutRisk = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface ForecastRun {
+  run_id: string;
+  model_version: string;
+  generated_at: string;
+  as_of_date: string;
+  forecast_start: string;
+  horizon: number;
+  /** Days with at least one completed bill that the forecast learned from. */
+  trading_days: number;
+}
+
+export interface ForecastStatus {
+  shop_id: number;
+  beta: boolean;
+  note: string;
+  model_version: string | null;
+  model_trained_at: string | null;
+  latest_run: ForecastRun | null;
+}
+
+export interface DailyDemand {
+  forecast_date: string;
+  predicted_demand: number;
+}
+
+export interface ProductForecast {
+  product_id: number;
+  sku: string;
+  product_name: string;
+  category: string;
+  method: string;
+  current_stock: number;
+  cumulative_predicted_demand: number;
+  stockout_risk: StockoutRisk;
+  predicted_stockout_date: string | null;
+  recommended_reorder_quantity: number;
+  model_version: string;
+  daily: DailyDemand[];
+}
+
+export interface ShopForecast {
+  run: ForecastRun;
+  shop_id: number;
+  horizon: number;
+  total_predicted_demand: number;
+  daily_totals: DailyDemand[];
+  items: ProductForecast[];
+}
+
+export interface StockoutAlert {
+  product_id: number;
+  sku: string;
+  product_name: string;
+  category: string;
+  current_stock: number;
+  inventory_known: boolean;
+  cumulative_predicted_demand: number;
+  days_of_cover: number | null;
+  predicted_stockout_date: string | null;
+  stockout_risk: StockoutRisk;
+  lead_days: number;
+  safety_stock: number;
+  reason: string;
+  model_version: string;
+}
+
+export interface StockoutAlerts {
+  run: ForecastRun;
+  shop_id: number;
+  risk_note: string;
+  counts: Record<StockoutRisk, number>;
+  items: StockoutAlert[];
+}
+
+export interface ReorderRecommendation {
+  product_id: number;
+  sku: string;
+  product_name: string;
+  category: string;
+  current_stock: number;
+  on_order: number;
+  cumulative_predicted_demand: number;
+  safety_stock: number;
+  reorder_point: number;
+  order_up_to: number;
+  lead_days: number;
+  minimum_order_quantity: number;
+  recommended_reorder_quantity: number;
+  order_by_date: string | null;
+  stockout_risk: StockoutRisk;
+  reason: string;
+  model_version: string;
+}
+
+export interface ReorderRecommendations {
+  run: ForecastRun;
+  shop_id: number;
+  items: ReorderRecommendation[];
+}
+
+export interface ForecastMetric {
+  evaluation: string;
+  method: string;
+  target: string;
+  /** 'overall' = every shop the model learned from; 'shop' = this shop only. */
+  scope: 'overall' | 'shop';
+  scope_id: string;
+  mae: number | null;
+  rmse: number | null;
+  wape: number | null;
+  bias: number | null;
+  n_obs: number;
+}
+
+export interface ForecastModelMetrics {
+  model_version: string;
+  trained_at: string;
+  train_start: string;
+  test_end: string | null;
+  evaluation_note: string;
+  metrics: ForecastMetric[];
 }

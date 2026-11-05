@@ -1,0 +1,22 @@
+{
+  "test_period": [
+    "2026-08-21",
+    "2026-11-04"
+  ],
+  "overall": {
+    "mae": 3.4501,
+    "rmse": 6.0725,
+    "wape": 0.4109,
+    "bias": -0.0017,
+    "n_obs": 79050
+  },
+  "by_category": {
+    "Beverages": 0.4243,
+    "Dairy": 0.3753,
+    "Fruits and Vegetables": 0.3824,
+    "Grocery": 0.4309,
+    "Household Products": 0.4571,
+    "Personal Care": 0.4549,
+    "Snacks": 0.4245
+  }
+}

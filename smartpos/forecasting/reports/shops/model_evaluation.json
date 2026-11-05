@@ -1,0 +1,152 @@
+{
+  "model_version": "shops-lgbm-20261104-44474e72",
+  "data_source": "smartpos",
+  "data": {
+    "shops": 3,
+    "trading_days": {
+      "1": 92,
+      "2": 90,
+      "3": 89
+    },
+    "through": "2026-11-04"
+  },
+  "artifact": "/Users/nandakumaransathyan/Projects/novac/smartpos/forecasting/artifacts/shops-lgbm-20261104-44474e72.joblib",
+  "objective": "poisson",
+  "trees": 120,
+  "splits": {
+    "train": [
+      "2026-07-31",
+      "2026-10-10"
+    ],
+    "validation": [
+      "2026-10-11",
+      "2026-10-24"
+    ],
+    "test": [
+      "2026-10-25",
+      "2026-11-04"
+    ]
+  },
+  "rows": {
+    "train": 3214,
+    "validation": 700,
+    "test": 250
+  },
+  "validation_selection": {
+    "poisson": {
+      "mae": 2.635804676620833,
+      "rmse": 3.4685758147407086,
+      "wape": 0.38843437339675435,
+      "bias": -0.046027528616696935,
+      "n_obs": 700,
+      "best_iteration": 120
+    },
+    "tweedie_1.2": {
+      "mae": 2.644850005244132,
+      "rmse": 3.4637810725696783,
+      "wape": 0.3897673691938721,
+      "bias": -0.03944953546819175,
+      "n_obs": 700,
+      "best_iteration": 73
+    },
+    "l2": {
+      "mae": 2.6448990202244573,
+      "rmse": 3.454294409636512,
+      "wape": 0.38977459245413054,
+      "bias": -0.02668773994895948,
+      "n_obs": 700,
+      "best_iteration": 61
+    }
+  },
+  "overall": {
+    "test/units_sold/lightgbm": {
+      "mae": 3.5198,
+      "rmse": 6.0067,
+      "wape": 0.6289,
+      "bias": 0.1321,
+      "n": 243
+    },
+    "test/units_sold/moving_average_7": {
+      "mae": 3.5442,
+      "rmse": 5.9467,
+      "wape": 0.6333,
+      "bias": 0.1471,
+      "n": 243
+    },
+    "test/units_sold/same_day_last_week": {
+      "mae": 4.2099,
+      "rmse": 6.7893,
+      "wape": 0.7522,
+      "bias": 0.1169,
+      "n": 243
+    },
+    "backtest/units_sold/lightgbm": {
+      "mae": 3.0686,
+      "rmse": 4.301,
+      "wape": 0.5803,
+      "bias": 0.1987,
+      "n": 229
+    },
+    "backtest/units_sold/moving_average_7": {
+      "mae": 3.2246,
+      "rmse": 4.3378,
+      "wape": 0.6098,
+      "bias": 0.2401,
+      "n": 229
+    },
+    "backtest/units_sold/same_day_last_week": {
+      "mae": 3.8341,
+      "rmse": 5.4661,
+      "wape": 0.725,
+      "bias": 0.185,
+      "n": 229
+    }
+  },
+  "backtest_wape_by_horizon_observed": {
+    "lightgbm": {
+      "1": 0.389,
+      "2": 0.4658,
+      "3": 0.5298,
+      "4": 0.6427,
+      "5": 0.6759,
+      "6": 2.1259
+    },
+    "moving_average_7": {
+      "1": 0.4149,
+      "2": 0.4744,
+      "3": 0.6393,
+      "4": 0.6506,
+      "5": 0.7568,
+      "6": 1.9096
+    },
+    "same_day_last_week": {
+      "1": 0.5411,
+      "2": 0.5485,
+      "3": 0.7066,
+      "4": 0.7844,
+      "5": 0.9189,
+      "6": 2.2653
+    }
+  },
+  "backtest_origins": [
+    "2026-10-24"
+  ],
+  "top_features_by_gain": {
+    "product_id": 36742.0,
+    "rolling_mean_14": 11573.0,
+    "day_of_week": 4553.0,
+    "category_id": 2278.0,
+    "rolling_mean_28": 1793.0,
+    "rolling_std_7": 1594.0,
+    "series_age": 1562.0,
+    "lag_1": 1385.0,
+    "days_to_festival": 1189.0,
+    "rolling_mean_7": 875.0,
+    "lag_14": 591.0,
+    "lag_28": 572.0,
+    "is_weekend": 472.0,
+    "lag_7": 462.0,
+    "rolling_std_28": 405.0
+  },
+  "seconds": 1.4
+}

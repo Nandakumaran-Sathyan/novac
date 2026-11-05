@@ -164,6 +164,7 @@ The API refuses to start if `Jwt:SigningKey` is missing or too short, or if `Sto
 - **Sales**: history with date filters and bill-number search, itemised bill with
   each line's discount.
 - **Reports**: daily sales and top products by revenue/profit for any date range.
+- **Demand forecasting (beta)**: for the signed-in owner's own shop, learned from its recorded sales and stock: 7-day product and category demand, stockout risk and dates, reorder suggestions using each product's supplier lead time and minimum order quantity; one LightGBM model for all shops in a separate Python service. See [docs/FORECASTING.md](docs/FORECASTING.md) and [forecasting/README.md](forecasting/README.md).
 - **AI assistant** (local, via Ollama): ask in plain language, from the dashboard panel or the **Assistant** page,
   about sales, top sellers, profit, low stock, expiry, inventory value and unsold products. Answers come only
   from read-only queries on your own shop, and figures the data doesn't support are withheld. See [docs/AI.md](docs/AI.md).
@@ -251,6 +252,7 @@ dotnet run --project src/SmartPOS.API -- reset-password --email you@example.com
 
 ## Documentation
 
+- [docs/FORECASTING.md](docs/FORECASTING.md): demand, stockout and replenishment forecasting (beta; Python + LightGBM service on each shop's own data): design, results, API
 - [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md): beginner's guide to every backend file, with code, how the files link, and one request traced end to end
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): layers, request flow, key decisions and trade-offs
 - [docs/DATABASE.md](docs/DATABASE.md): PostgreSQL setup, migrations, schema and integrity rules

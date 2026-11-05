@@ -18,7 +18,7 @@ public sealed class ProductService(
         p.Inventory != null ? p.Inventory.StockQuantity : 0,
         p.Inventory != null ? p.Inventory.LowStockThreshold : 0,
         p.Inventory != null && p.Inventory.StockQuantity <= p.Inventory.LowStockThreshold,
-        p.ExpiryDate, p.IsActive, p.CreatedAt, p.UpdatedAt);
+        p.ExpiryDate, p.LeadTimeDays, p.MinimumOrderQuantity, p.IsActive, p.CreatedAt, p.UpdatedAt);
 
     public static string NormalizeSku(string sku) => sku.Trim().ToUpperInvariant();
 
@@ -70,6 +70,8 @@ public sealed class ProductService(
             Price = request.Price,
             CostPrice = request.CostPrice,
             ExpiryDate = request.ExpiryDate,
+            LeadTimeDays = request.LeadTimeDays,
+            MinimumOrderQuantity = request.MinimumOrderQuantity,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
@@ -125,6 +127,8 @@ public sealed class ProductService(
         product.Price = request.Price;
         product.CostPrice = request.CostPrice;
         product.ExpiryDate = request.ExpiryDate;
+        product.LeadTimeDays = request.LeadTimeDays;
+        product.MinimumOrderQuantity = request.MinimumOrderQuantity;
         product.IsActive = request.IsActive;
         product.UpdatedAt = now;
         if (product.Inventory is { } inventory && inventory.LowStockThreshold != request.LowStockThreshold)

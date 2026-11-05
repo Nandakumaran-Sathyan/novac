@@ -132,6 +132,16 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("LeadTimeDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
+                    b.Property<int>("MinimumOrderQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -167,6 +177,10 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                     b.ToTable("Products", null, t =>
                         {
                             t.HasCheckConstraint("CK_Products_CostPrice_NonNegative", "\"CostPrice\" >= 0");
+
+                            t.HasCheckConstraint("CK_Products_LeadTimeDays_Range", "\"LeadTimeDays\" BETWEEN 1 AND 90");
+
+                            t.HasCheckConstraint("CK_Products_MinimumOrderQuantity_Positive", "\"MinimumOrderQuantity\" >= 1");
 
                             t.HasCheckConstraint("CK_Products_Price_NonNegative", "\"Price\" >= 0");
                         });

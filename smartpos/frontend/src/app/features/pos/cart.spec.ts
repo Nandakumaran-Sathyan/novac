@@ -8,7 +8,7 @@ const line = (unitPrice: number, quantity: number, available = 100, productId = 
 
 const product = (id: number, price: number, stockQuantity: number): Product => ({
   id, sku: `SKU-${id}`, name: `Item ${id}`, barcode: null, description: null, category: 'Test',
-  price, costPrice: 0, stockQuantity, lowStockThreshold: 0, isLowStock: false, expiryDate: null, isActive: true,
+  price, costPrice: 0, stockQuantity, lowStockThreshold: 0, isLowStock: false, expiryDate: null, leadTimeDays: 3, minimumOrderQuantity: 1, isActive: true,
   createdAt: '', updatedAt: '',
 });
 

@@ -19,6 +19,7 @@ public static class ApiServiceCollectionExtensions
     public const string CorsPolicy = "SmartPosWeb";
     public const string LoginRateLimitPolicy = "login";
     public const string AIRateLimitPolicy = "ai";
+    public const string ForecastGenerateRateLimitPolicy = "forecast-generate";
 
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
@@ -60,9 +61,20 @@ public static class ApiServiceCollectionExtensions
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0
                 }));
+            // Generating a forecast recomputes the whole shop: a few runs per minute per shop is plenty.
+            options.AddPolicy(ForecastGenerateRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirst(SmartPosClaims.ShopId)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = configuration.GetValue("Forecasting:GeneratePerMinute", 3),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
         });
 
         services.AddHealthChecks()
+            // Degraded, not Unhealthy: the shop works without forecasting.
+            .AddCheck<ForecastingHealthCheck>("forecasting", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded)
             .AddCheck<DatabaseHealthCheck>("database")
             // Degraded, not Unhealthy: selling works without the AI assistant.
             .AddCheck<AIModelHealthCheck>("ai-model", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);

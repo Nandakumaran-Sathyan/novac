@@ -1,0 +1,299 @@
+{
+  "passed": true,
+  "checks": {
+    "duplicate_daily_sales": 0,
+    "duplicate_inventory_rows": 0,
+    "null_required_sales_values": 0,
+    "null_required_inventory_values": 0,
+    "negative_quantities": 0,
+    "sold_more_than_demanded": 0,
+    "ledger_does_not_balance": 0,
+    "sales_without_inventory_row": 0,
+    "units_differ_between_sales_and_inventory": 0,
+    "stockout_flag_disagrees_with_lost_demand": 0,
+    "revenue_mismatch": 0,
+    "orphan_sales_rows": 0,
+    "purchase_orders_received_before_ordered": 0,
+    "products_without_supplier_lead_time": 0
+  },
+  "shape": {
+    "stores": 10,
+    "products": 105,
+    "sales_rows": 759590,
+    "first_day": "2024-10-21",
+    "last_day": "2026-11-04",
+    "days": 745,
+    "units_sold": 6509656,
+    "latent_demand": 6664273,
+    "lost_demand": 154617
+  },
+  "missing_days": {
+    "series": 1050,
+    "missing_days": 2040,
+    "series_with_gaps": 1020
+  },
+  "lost_demand_pct": 2.32,
+  "weekend_vs_weekday_ratio": {
+    "Chennai": 1.466,
+    "Other cities": 1.146
+  },
+  "summer_vs_winter_ratio_by_category": {
+    "Beverages": 2.194,
+    "Dairy": 1.262,
+    "Fruits and Vegetables": 1.076,
+    "Grocery": 0.933,
+    "Household Products": 0.938,
+    "Personal Care": 1.094,
+    "Snacks": 0.865
+  },
+  "festival_vs_ordinary_chain_demand": [
+    {
+      "period": "Tamil New Year",
+      "chain_units_per_day": 11100.0,
+      "days": 6
+    },
+    {
+      "period": "Diwali",
+      "chain_units_per_day": 10830.0,
+      "days": 17
+    },
+    {
+      "period": "Pongal",
+      "chain_units_per_day": 9590.0,
+      "days": 14
+    },
+    {
+      "period": "Vinayagar Chaturthi",
+      "chain_units_per_day": 9171.0,
+      "days": 6
+    },
+    {
+      "period": "Ayudha Pooja",
+      "chain_units_per_day": 9061.0,
+      "days": 8
+    },
+    {
+      "period": "Ordinary day",
+      "chain_units_per_day": 8874.0,
+      "days": 682
+    },
+    {
+      "period": "New Year",
+      "chain_units_per_day": 8359.0,
+      "days": 4
+    },
+    {
+      "period": "Christmas",
+      "chain_units_per_day": 8316.0,
+      "days": 8
+    }
+  ],
+  "promotion_lift_by_category": [
+    {
+      "category_name": "Snacks",
+      "promo_lift": 1.71
+    },
+    {
+      "category_name": "Beverages",
+      "promo_lift": 1.61
+    },
+    {
+      "category_name": "Personal Care",
+      "promo_lift": 1.58
+    },
+    {
+      "category_name": "Fruits and Vegetables",
+      "promo_lift": 1.47
+    },
+    {
+      "category_name": "Household Products",
+      "promo_lift": 1.42
+    },
+    {
+      "category_name": "Grocery",
+      "promo_lift": 1.37
+    },
+    {
+      "category_name": "Dairy",
+      "promo_lift": 1.21
+    }
+  ],
+  "by_category": [
+    {
+      "category_name": "Dairy",
+      "mean_daily_demand": 13.74,
+      "lost_demand_pct": 1.44,
+      "promo_day_pct": 3.32
+    },
+    {
+      "category_name": "Fruits and Vegetables",
+      "mean_daily_demand": 12.5,
+      "lost_demand_pct": 4.0,
+      "promo_day_pct": 3.32
+    },
+    {
+      "category_name": "Beverages",
+      "mean_daily_demand": 9.91,
+      "lost_demand_pct": 1.63,
+      "promo_day_pct": 8.19
+    },
+    {
+      "category_name": "Grocery",
+      "mean_daily_demand": 7.56,
+      "lost_demand_pct": 2.02,
+      "promo_day_pct": 8.17
+    },
+    {
+      "category_name": "Snacks",
+      "mean_daily_demand": 7.22,
+      "lost_demand_pct": 2.33,
+      "promo_day_pct": 8.62
+    },
+    {
+      "category_name": "Personal Care",
+      "mean_daily_demand": 5.56,
+      "lost_demand_pct": 2.32,
+      "promo_day_pct": 7.86
+    },
+    {
+      "category_name": "Household Products",
+      "mean_daily_demand": 4.82,
+      "lost_demand_pct": 2.24,
+      "promo_day_pct": 8.12
+    }
+  ],
+  "by_store": [
+    {
+      "store_id": "STR001",
+      "city": "Chennai",
+      "store_type": "Hypermarket",
+      "units_per_day": 1626.0,
+      "lost_demand_pct": 2.72
+    },
+    {
+      "store_id": "STR002",
+      "city": "Chennai",
+      "store_type": "Supermarket",
+      "units_per_day": 967.0,
+      "lost_demand_pct": 1.96
+    },
+    {
+      "store_id": "STR003",
+      "city": "Chennai",
+      "store_type": "Supermarket",
+      "units_per_day": 932.0,
+      "lost_demand_pct": 2.28
+    },
+    {
+      "store_id": "STR004",
+      "city": "Coimbatore",
+      "store_type": "Hypermarket",
+      "units_per_day": 1412.0,
+      "lost_demand_pct": 2.52
+    },
+    {
+      "store_id": "STR005",
+      "city": "Coimbatore",
+      "store_type": "Supermarket",
+      "units_per_day": 853.0,
+      "lost_demand_pct": 2.31
+    },
+    {
+      "store_id": "STR006",
+      "city": "Madurai",
+      "store_type": "Supermarket",
+      "units_per_day": 816.0,
+      "lost_demand_pct": 2.3
+    },
+    {
+      "store_id": "STR007",
+      "city": "Trichy",
+      "store_type": "Supermarket",
+      "units_per_day": 831.0,
+      "lost_demand_pct": 2.57
+    },
+    {
+      "store_id": "STR008",
+      "city": "Salem",
+      "store_type": "Neighbourhood",
+      "units_per_day": 504.0,
+      "lost_demand_pct": 1.86
+    },
+    {
+      "store_id": "STR009",
+      "city": "Erode",
+      "store_type": "Neighbourhood",
+      "units_per_day": 543.0,
+      "lost_demand_pct": 1.77
+    },
+    {
+      "store_id": "STR010",
+      "city": "Tirunelveli",
+      "store_type": "Neighbourhood",
+      "units_per_day": 488.0,
+      "lost_demand_pct": 1.88
+    }
+  ],
+  "stockouts_by_supplier": [
+    {
+      "supplier_name": "Koyambedu Fresh Produce Traders",
+      "lead_days": 1,
+      "stockout_day_pct": 3.62
+    },
+    {
+      "supplier_name": "Southern Oils & Pulses",
+      "lead_days": 6,
+      "stockout_day_pct": 2.31
+    },
+    {
+      "supplier_name": "Hygiene Home Supplies",
+      "lead_days": 10,
+      "stockout_day_pct": 2.3
+    },
+    {
+      "supplier_name": "Coastal Confectionery Wholesale",
+      "lead_days": 5,
+      "stockout_day_pct": 2.26
+    },
+    {
+      "supplier_name": "Madurai Spice Merchants",
+      "lead_days": 5,
+      "stockout_day_pct": 1.88
+    },
+    {
+      "supplier_name": "TN Personal Care Distributors",
+      "lead_days": 8,
+      "stockout_day_pct": 1.86
+    },
+    {
+      "supplier_name": "Thanjavur Rice & Grains",
+      "lead_days": 4,
+      "stockout_day_pct": 1.84
+    },
+    {
+      "supplier_name": "Nilgiris Tea & Coffee Estates",
+      "lead_days": 7,
+      "stockout_day_pct": 1.74
+    },
+    {
+      "supplier_name": "Kongu Snacks & Sweets",
+      "lead_days": 3,
+      "stockout_day_pct": 1.52
+    },
+    {
+      "supplier_name": "Pooja & Home Essentials",
+      "lead_days": 6,
+      "stockout_day_pct": 1.41
+    },
+    {
+      "supplier_name": "Chennai Beverage Distributors",
+      "lead_days": 3,
+      "stockout_day_pct": 1.25
+    },
+    {
+      "supplier_name": "Kaveri Dairy Cooperative",
+      "lead_days": 1,
+      "stockout_day_pct": 1.17
+    }
+  ]
+}

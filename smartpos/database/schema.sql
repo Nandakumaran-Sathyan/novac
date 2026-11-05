@@ -232,3 +232,17 @@ VALUES ('20261103131345_RemoveTax', '10.0.12');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "Products" ADD "LeadTimeDays" integer NOT NULL DEFAULT 3;
+
+ALTER TABLE "Products" ADD "MinimumOrderQuantity" integer NOT NULL DEFAULT 1;
+
+ALTER TABLE "Products" ADD CONSTRAINT "CK_Products_LeadTimeDays_Range" CHECK ("LeadTimeDays" BETWEEN 1 AND 90);
+
+ALTER TABLE "Products" ADD CONSTRAINT "CK_Products_MinimumOrderQuantity_Positive" CHECK ("MinimumOrderQuantity" >= 1);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261105064430_AddProductLeadTimeAndMoq', '10.0.12');
+
+COMMIT;
+

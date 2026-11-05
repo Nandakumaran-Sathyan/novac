@@ -12,6 +12,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         {
             t.HasCheckConstraint("CK_Products_Price_NonNegative", "\"Price\" >= 0");
             t.HasCheckConstraint("CK_Products_CostPrice_NonNegative", "\"CostPrice\" >= 0");
+            t.HasCheckConstraint("CK_Products_LeadTimeDays_Range", "\"LeadTimeDays\" BETWEEN 1 AND 90");
+            t.HasCheckConstraint("CK_Products_MinimumOrderQuantity_Positive", "\"MinimumOrderQuantity\" >= 1");
         });
 
         builder.Property(p => p.Sku).HasMaxLength(50).IsRequired();
@@ -21,6 +23,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Category).HasMaxLength(100).IsRequired();
         builder.Property(p => p.Price).HasPrecision(18, 2);
         builder.Property(p => p.CostPrice).HasPrecision(18, 2);
+        builder.Property(p => p.LeadTimeDays).HasDefaultValue(3);
+        builder.Property(p => p.MinimumOrderQuantity).HasDefaultValue(1);
 
         // SKU and barcode are unique per shop (two shops may both stock "COLA-500"). PostgreSQL allows
         // many NULLs in a unique index, so products without a barcode don't collide.

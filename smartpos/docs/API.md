@@ -23,8 +23,8 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 | GET | `/api/settings/pos` | Shop name and address, currency, max discount, loyalty earning rate |
 | GET | `/api/products` | `search` (name, SKU or barcode), `category` (exact name), `includeInactive`, `page`, `pageSize` |
 | GET | `/api/products/{id}` | One product |
-| POST | `/api/products` | `{ sku, barcode?, name, description?, category, price, costPrice, lowStockThreshold, expiryDate?, initialStock }` → 201 (creates its inventory row; `initialStock` recorded as a movement) |
-| PUT | `/api/products/{id}` | Full replace of details/prices/threshold/active flag (not stock); omitted optional fields are cleared |
+| POST | `/api/products` | `{ sku, barcode?, name, description?, category, price, costPrice, lowStockThreshold, expiryDate?, leadTimeDays? (1-90, default 3), minimumOrderQuantity? (≥ 1, default 1), initialStock }` → 201 (creates its inventory row; `initialStock` recorded as a movement) |
+| PUT | `/api/products/{id}` | Full replace of details/prices/threshold/lead time/minimum order/active flag (not stock); omitted optional fields are cleared, omitted lead time and minimum order reset to 3 and 1 |
 | DELETE | `/api/products/{id}` | 204; 409 if the product has sales |
 | GET | `/api/categories` | Distinct category names in use, with product counts (a category exists once a product uses it) |
 | GET | `/api/customers` | `search` (name or phone), paging |
@@ -41,6 +41,8 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 | GET | `/api/reports/top-products` | `from`, `to`, `limit` (1–50, default 10) |
 | POST | `/api/ai/chat` | `{ message, history?: [{ role: "user"|"assistant", content }] }` → `{ reply, toolsUsed, truncated, durationMs }`. Message 1-1000 chars; up to 40 history turns of 4000 chars (only the newest 12 are used); roles `system`/`tool` are rejected. Rate limited per user (10/min); 429 if your previous question is still running; 503 if the AI model is unavailable. See docs/AI.md |
 | GET | `/api/ai/status` | Whether the AI assistant can answer: Ollama reachable, model installed, tool calling supported (see docs/AI.md) |
+| GET | `/api/forecasting/status`, `/forecast?horizon=&category=`, `/categories`, `/stockout-alerts?risk=`, `/replenishment?onlyNeeded=`, `/products/{id}/forecast`, `/metrics?evaluation=` | Forecasts (beta) for the caller's own shop (the shop comes from the token), forwarded to the forecasting service (see docs/FORECASTING.md) |
+| POST | `/api/forecasting/generate` | Refresh the caller's shop's 7-day forecast (3 per minute per shop; 409 with under 7 days of sales) |
 | GET | `/health` | Public. `{ status, checks: [{ name, status }] }`; 503 when the DB is unreachable |
 
 ## Pagination

@@ -48,6 +48,8 @@ export class ProductForm implements OnInit {
     initialStock: this.fb.control<number | null>(0, [Validators.required, Validators.min(0), Validators.max(1_000_000), Validators.pattern(/^\d+$/)]),
     lowStockThreshold: this.fb.control<number | null>(20, [Validators.required, Validators.min(0), Validators.max(1_000_000), Validators.pattern(/^\d+$/)]),
     expiryDate: [''],
+    leadTimeDays: this.fb.control<number | null>(3, [Validators.required, Validators.min(1), Validators.max(90), Validators.pattern(/^\d+$/)]),
+    minimumOrderQuantity: this.fb.control<number | null>(1, [Validators.required, Validators.min(1), Validators.max(10_000), Validators.pattern(/^\d+$/)]),
     isActive: [true],
   });
 
@@ -74,6 +76,8 @@ export class ProductForm implements OnInit {
           costPrice: p.costPrice,
           lowStockThreshold: p.lowStockThreshold,
           expiryDate: p.expiryDate ?? '',
+          leadTimeDays: p.leadTimeDays,
+          minimumOrderQuantity: p.minimumOrderQuantity,
           isActive: p.isActive,
         });
         this.currentStock.set(p.stockQuantity);
@@ -107,6 +111,8 @@ export class ProductForm implements OnInit {
       costPrice: v.costPrice!,
       lowStockThreshold: v.lowStockThreshold!,
       expiryDate: v.expiryDate || null,
+      leadTimeDays: v.leadTimeDays!,
+      minimumOrderQuantity: v.minimumOrderQuantity!,
       ...(this.isEdit() ? { isActive: v.isActive } : { initialStock: v.initialStock! }),
     };
 
