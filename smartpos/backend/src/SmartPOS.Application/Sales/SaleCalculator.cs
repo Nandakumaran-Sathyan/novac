@@ -7,14 +7,17 @@ public sealed record SaleLineInput(decimal UnitPrice, int Quantity);
 
 /// <summary>
 /// Per-line lists run in the same order as the input lines. A line's total is its subtotal (unit
-/// price × quantity) minus its share of the discount, and the line totals add up to exactly <see cref="Total"/>.
+/// price × quantity) minus its share of the discount and of the points redeemed, and the line totals add up to
+/// exactly <see cref="Total"/>.
 /// </summary>
 public sealed record SaleTotals(
     IReadOnlyList<decimal> LineSubtotals,
     IReadOnlyList<decimal> LineDiscounts,
+    IReadOnlyList<decimal> LineRedemptions,
     IReadOnlyList<decimal> LineTotals,
     decimal Subtotal,
     decimal DiscountAmount,
+    decimal RedemptionAmount,
     decimal Total);
 
 /// <summary>
@@ -24,9 +27,11 @@ public sealed record SaleTotals(
 /// <item>Line subtotal = unit price × quantity, rounded to 2 dp.</item>
 /// <item>Subtotal = sum of line subtotals.</item>
 /// <item>Discount = subtotal × discount% (sale-level), rounded.</item>
-/// <item>Total = subtotal − discount. No tax is charged.</item>
-/// <item>The discount is then split across lines in proportion to their value, to the cent
-/// (largest remainder), so the lines always add up to exactly the sale figures.</item>
+/// <item>Redemption = the value of loyalty points used, taken off after the discount (0 to the amount left).</item>
+/// <item>Total = subtotal − discount − redemption. No tax is charged.</item>
+/// <item>The discount is split across lines in proportion to their value, then the redemption in proportion to
+/// what is left of each line, to the cent (largest remainder), so the lines always add up to exactly the sale
+/// figures and no line goes below zero.</item>
 /// </list>
 /// Rounding is half away from zero, which matches what customers expect on a receipt.
 /// </summary>
@@ -35,7 +40,7 @@ public static class SaleCalculator
     /// <summary>Largest amount the DECIMAL(12,2) money columns can hold.</summary>
     public const decimal MaxAmount = 9_999_999_999.99m;
 
-    public static SaleTotals Calculate(IReadOnlyList<SaleLineInput> lines, decimal discountPercent)
+    public static SaleTotals Calculate(IReadOnlyList<SaleLineInput> lines, decimal discountPercent, decimal redemptionAmount = 0)
     {
         if (lines.Count == 0)
             throw new BusinessRuleException("A sale must contain at least one item.");
@@ -57,10 +62,18 @@ public static class SaleCalculator
             throw new BusinessRuleException("This sale is too large to record.");
         var discount = Round(subtotal * discountPercent / 100m);
 
-        var lineDiscounts = Allocate(discount, lineSubtotals);
-        var lineTotals = lineSubtotals.Select((value, i) => value - lineDiscounts[i]).ToList();
+        if (redemptionAmount < 0 || redemptionAmount != Round(redemptionAmount))
+            throw new BusinessRuleException("The value of points redeemed must be zero or more, in whole cents.");
+        if (redemptionAmount > subtotal - discount)
+            throw new BusinessRuleException("Points redeemed cannot be worth more than the amount due.");
 
-        return new SaleTotals(lineSubtotals, lineDiscounts, lineTotals, subtotal, discount, subtotal - discount);
+        var lineDiscounts = Allocate(discount, lineSubtotals);
+        var afterDiscount = lineSubtotals.Select((value, i) => value - lineDiscounts[i]).ToList();
+        var lineRedemptions = Allocate(redemptionAmount, afterDiscount);
+        var lineTotals = afterDiscount.Select((value, i) => value - lineRedemptions[i]).ToList();
+
+        return new SaleTotals(lineSubtotals, lineDiscounts, lineRedemptions, lineTotals, subtotal, discount, redemptionAmount,
+            subtotal - discount - redemptionAmount);
     }
 
     /// <summary>

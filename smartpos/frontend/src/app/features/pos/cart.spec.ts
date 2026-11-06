@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Product } from '../../core/models';
-import { addProduct, calculateTotals, CartLine, clampQuantity, removeLine, setQuantity } from './cart';
+import { addProduct, calculateTotals, CartLine, clampQuantity, maxRedeemablePoints, pointsValue, removeLine, setQuantity } from './cart';
 
 const line = (unitPrice: number, quantity: number, available = 100, productId = 1): CartLine => ({
   productId, sku: `SKU-${productId}`, name: `Item ${productId}`, unitPrice, quantity, available,
@@ -16,7 +16,7 @@ describe('calculateTotals (mirrors the server SaleCalculator)', () => {
   it('matches the server example: discount rounded half away from zero, no tax', () => {
     // Same figures as SaleCalculatorTests on the backend.
     const totals = calculateTotals([line(99.99, 3, 100, 1), line(40, 3, 100, 2)], 10);
-    expect(totals).toEqual({ subtotal: 419.97, discountAmount: 42, total: 377.97 });
+    expect(totals).toEqual({ subtotal: 419.97, discountAmount: 42, pointsAmount: 0, total: 377.97 });
   });
 
   it('avoids floating-point drift', () => {
@@ -32,7 +32,32 @@ describe('calculateTotals (mirrors the server SaleCalculator)', () => {
   });
 
   it('is zero for an empty cart', () => {
-    expect(calculateTotals([], 10)).toEqual({ subtotal: 0, discountAmount: 0, total: 0 });
+    expect(calculateTotals([], 10)).toEqual({ subtotal: 0, discountAmount: 0, pointsAmount: 0, total: 0 });
+  });
+});
+
+describe('loyalty points (mirror LoyaltyRules and SaleCalculator on the server)', () => {
+  it('takes points off after the discount, as the server test does', () => {
+    // 91.00 + 120.00 + 29.97 = 240.97; 10% = 24.10; 50 points at 1.00 = 50.00 → 166.87.
+    const totals = calculateTotals([line(45.5, 2, 100, 1), line(120, 1, 100, 2), line(9.99, 3, 100, 3)], 10, pointsValue(50, 1));
+    expect(totals).toEqual({ subtotal: 240.97, discountAmount: 24.1, pointsAmount: 50, total: 166.87 });
+  });
+
+  it('never takes the bill below zero', () => {
+    expect(calculateTotals([line(10, 1)], 0, 25).total).toBe(0);
+  });
+
+  it('values points in whole cents', () => {
+    expect(pointsValue(7, 0.25)).toBe(1.75);
+    expect(pointsValue(3, 0.33)).toBe(0.99);
+  });
+
+  it('limits redemption to the balance and to the amount due', () => {
+    expect(maxRedeemablePoints(120, 300, 1)).toBe(120);
+    expect(maxRedeemablePoints(500, 216.87, 1)).toBe(216);
+    expect(maxRedeemablePoints(500, 10, 0.25)).toBe(40);
+    expect(maxRedeemablePoints(100, 0, 1)).toBe(0);
+    expect(maxRedeemablePoints(0, 300, 1)).toBe(0);
   });
 });
 

@@ -20,8 +20,8 @@ public class SaleItem
     public decimal UnitPrice { get; set; }
     /// <summary>What the product cost us at the time of sale (for profit reports).</summary>
     public decimal UnitCost { get; set; }
-    /// <summary>This line's share of the sale-level discount.</summary>
+    /// <summary>This line's share of the bill's reductions: the sale-level discount plus any loyalty points redeemed.</summary>
     public decimal DiscountAmount { get; set; }
-    /// <summary>Final amount for this line: unit price × quantity − discount.</summary>
+    /// <summary>Final amount for this line: unit price × quantity − DiscountAmount.</summary>
     public decimal LineTotal { get; set; }
 }

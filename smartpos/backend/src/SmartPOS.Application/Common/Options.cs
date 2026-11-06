@@ -34,6 +34,11 @@ public sealed class LoyaltyOptions
     /// <summary>Amount a customer spends to earn one point (in the store currency). 100 means 1 point per 100 spent.</summary>
     [Range(typeof(decimal), "1", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
     public decimal SpendPerPoint { get; set; } = 100;
+
+    /// <summary>What one point is worth when redeemed, in the store currency. 1 means 100 points take 100 off a bill.</summary>
+    [Range(typeof(decimal), "0.01", "1000000", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
+    [MaxDecimalPlaces(2)]
+    public decimal PointValue { get; set; } = 1;
 }
 
 /// <summary>Bound from the "App" configuration section.</summary>

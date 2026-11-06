@@ -39,9 +39,18 @@ public sealed class SaleService(
         if (lines.Count == 0)
             throw new BusinessRuleException("A sale must contain at least one item.");
 
-        if (request.CustomerId is { } customerId &&
-            !await db.Customers.AnyAsync(c => c.Id == customerId, cancellationToken))
-            throw new BusinessRuleException($"Customer {customerId} does not exist.");
+        int? pointsBalance = null;
+        if (request.CustomerId is { } customerId)
+        {
+            pointsBalance = await db.Customers.Where(c => c.Id == customerId).Select(c => (int?)c.LoyaltyPoints)
+                                .SingleOrDefaultAsync(cancellationToken)
+                            ?? throw new BusinessRuleException($"Customer {customerId} does not exist.");
+        }
+        var pointsToRedeem = request.LoyaltyPointsToRedeem;
+        if (pointsToRedeem > 0 && pointsBalance is null)
+            throw new BusinessRuleException("Choose the customer whose points are being redeemed.");
+        if (pointsToRedeem > pointsBalance)
+            throw new BusinessRuleException($"The customer has only {pointsBalance} points.");
 
         var productIds = lines.Select(l => l.ProductId).ToList();
         var products = await db.Products.AsNoTracking()
@@ -57,9 +66,17 @@ public sealed class SaleService(
         }
 
         // Prices come from the database, never from the client.
-        var totals = SaleCalculator.Calculate(
-            lines.Select(l => new SaleLineInput(products[l.ProductId].Price, l.Quantity)).ToList(),
-            request.DiscountPercent);
+        var priced = lines.Select(l => new SaleLineInput(products[l.ProductId].Price, l.Quantity)).ToList();
+        var loyalty = loyaltyOptions.Value;
+        var totals = SaleCalculator.Calculate(priced, request.DiscountPercent);
+        if (pointsToRedeem > 0)
+        {
+            var usable = LoyaltyRules.MaxRedeemable(pointsBalance!.Value, totals.Total, loyalty.PointValue);
+            if (pointsToRedeem > usable)
+                throw new BusinessRuleException(
+                    $"At most {usable} points can be used on this bill (they can't be worth more than the {totals.Total:0.00} due).");
+            totals = SaleCalculator.Calculate(priced, request.DiscountPercent, LoyaltyRules.RedemptionValue(pointsToRedeem, loyalty.PointValue));
+        }
         var (amountPaid, changeAmount) = SaleCalculator.Settle(totals.Total, request.PaymentMethod, request.AmountPaid);
 
         var now = calendar.UtcNow;
@@ -72,11 +89,13 @@ public sealed class SaleService(
             Subtotal = totals.Subtotal,
             DiscountPercent = request.DiscountPercent,
             DiscountAmount = totals.DiscountAmount,
+            LoyaltyPointsRedeemed = pointsToRedeem,
+            LoyaltyRedemptionAmount = totals.RedemptionAmount,
             TotalAmount = totals.Total,
             PaymentMethod = request.PaymentMethod,
             AmountPaid = amountPaid,
             ChangeAmount = changeAmount,
-            LoyaltyPointsEarned = request.CustomerId is null ? 0 : LoyaltyRules.PointsEarned(totals.Total, loyaltyOptions.Value.SpendPerPoint),
+            LoyaltyPointsEarned = request.CustomerId is null ? 0 : LoyaltyRules.PointsEarned(totals.Total, loyalty.SpendPerPoint),
             Status = SaleStatus.Completed,
             CreatedAt = now
         };
@@ -101,7 +120,7 @@ public sealed class SaleService(
                 Quantity = quantity,
                 UnitPrice = product.Price,
                 UnitCost = product.CostPrice,
-                DiscountAmount = totals.LineDiscounts[i],
+                DiscountAmount = totals.LineDiscounts[i] + totals.LineRedemptions[i],
                 LineTotal = totals.LineTotals[i]
             });
             db.StockMovements.Add(new StockMovement
@@ -120,17 +139,21 @@ public sealed class SaleService(
 
         db.Sales.Add(sale);
         await db.SaveChangesAsync(cancellationToken);
-        if (sale.LoyaltyPointsEarned > 0)
+        if (sale.LoyaltyPointsEarned > 0 || pointsToRedeem > 0)
         {
-            // Add to the balance in the database (not read-modify-write) so two bills for one customer can't lose points.
-            var points = sale.LoyaltyPointsEarned;
-            await db.Customers.Where(c => c.Id == request.CustomerId)
-                .ExecuteUpdateAsync(s => s.SetProperty(c => c.LoyaltyPoints, c => c.LoyaltyPoints + points), cancellationToken);
+            // Change the balance in the database (not read-modify-write) so two bills for one customer can't lose
+            // points. The WHERE makes spending atomic, like the stock update: if another bill spent the points first,
+            // no row matches and this sale rolls back instead of taking the balance below zero.
+            var change = sale.LoyaltyPointsEarned - pointsToRedeem;
+            var updated = await db.Customers.Where(c => c.Id == request.CustomerId && c.LoyaltyPoints >= pointsToRedeem)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.LoyaltyPoints, c => c.LoyaltyPoints + change), cancellationToken);
+            if (updated == 0)
+                throw new ConflictException("The customer's points balance has just changed. Check it and try again.");
         }
         await transaction.CommitAsync(cancellationToken);
 
-        logger.LogInformation("Sale {BillNumber} created by user {UserId}: {ItemCount} lines, total {Total}",
-            sale.BillNumber, currentUser.UserId, sale.Items.Count, sale.TotalAmount);
+        logger.LogInformation("Sale {BillNumber} created by user {UserId}: {ItemCount} lines, total {Total}, points +{Earned} -{Redeemed}",
+            sale.BillNumber, currentUser.UserId, sale.Items.Count, sale.TotalAmount, sale.LoyaltyPointsEarned, pointsToRedeem);
         return await GetAsync(sale.Id, cancellationToken);
     }
 
@@ -167,7 +190,8 @@ public sealed class SaleService(
                        .Select(s => new SaleDto(
                            s.Id, s.BillNumber, s.CreatedAt, s.UserId, s.User.FullName,
                            s.CustomerId, s.Customer != null ? s.Customer.Name : null,
-                           s.Status, s.PaymentMethod, s.LoyaltyPointsEarned, s.Customer != null ? s.Customer.LoyaltyPoints : null,
+                           s.Status, s.PaymentMethod, s.LoyaltyPointsEarned, s.LoyaltyPointsRedeemed, s.LoyaltyRedemptionAmount,
+                           s.Customer != null ? s.Customer.LoyaltyPoints : null,
                            s.Subtotal, s.DiscountPercent, s.DiscountAmount,
                            s.TotalAmount, s.AmountPaid, s.ChangeAmount,
                            s.Items.OrderBy(i => i.Id)
@@ -189,7 +213,7 @@ public sealed class SaleService(
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw NotFoundException.For("Shop", currentUser.ShopId);
         return new PosSettingsDto(shop.ShopName, shop.Address, store.CurrencyCode, store.TimeZoneId,
-            DiscountPolicy.MaxDiscountPercent(pos), loyaltyOptions.Value.SpendPerPoint);
+            DiscountPolicy.MaxDiscountPercent(pos), loyaltyOptions.Value.SpendPerPoint, loyaltyOptions.Value.PointValue);
     }
 
     /// <summary>The shop's own sales (the DbContext's shop filter does the scoping).</summary>

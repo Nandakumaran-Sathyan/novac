@@ -13,7 +13,7 @@ import { ConfirmService } from '../../core/ui/confirm.service';
 import { Icon } from '../../shared/components/icon';
 import { EmptyState, ErrorAlert, Loading } from '../../shared/components/states';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
-import { addProduct, calculateTotals, CartLine, lineTotal, removeLine, setQuantity } from './cart';
+import { addProduct, calculateTotals, CartLine, lineTotal, maxRedeemablePoints, pointsValue, removeLine, setQuantity } from './cart';
 
 @Component({
   selector: 'app-pos',
@@ -53,6 +53,8 @@ export class Pos implements OnInit {
   protected readonly submitting = signal(false);
   protected readonly checkoutError = signal<string | null>(null);
   protected readonly completedSale = signal<Sale | null>(null);
+  /** Loyalty points the customer wants to spend on this bill. */
+  protected readonly pointsToRedeem = signal(0);
 
   protected readonly spendPerPoint = computed(() => this.settings.settings()?.loyaltySpendPerPoint ?? 0);
   /** Same rule as the server (LoyaltyRules): floor(total / spend per point), customers only. */
@@ -65,8 +67,20 @@ export class Pos implements OnInit {
     const d = this.discountPercent();
     return !Number.isFinite(d) || d < 0 || d > this.maxDiscount();
   });
+  protected readonly pointValue = computed(() => this.settings.settings()?.loyaltyPointValue ?? 0);
+  private readonly validDiscount = computed(() => (this.discountInvalid() ? 0 : this.discountPercent()));
+  /** Points can't be worth more than what is left after the discount, or than the customer's balance. */
+  protected readonly maxPoints = computed(() => {
+    const c = this.customer();
+    const due = calculateTotals(this.lines(), this.validDiscount()).total;
+    return c ? maxRedeemablePoints(c.loyaltyPoints, due, this.pointValue()) : 0;
+  });
+  protected readonly pointsInvalid = computed(() => {
+    const p = this.pointsToRedeem();
+    return !Number.isInteger(p) || p < 0 || p > this.maxPoints();
+  });
   protected readonly totals = computed(() =>
-    calculateTotals(this.lines(), this.discountInvalid() ? 0 : this.discountPercent()),
+    calculateTotals(this.lines(), this.validDiscount(), this.pointsInvalid() ? 0 : pointsValue(this.pointsToRedeem(), this.pointValue())),
   );
   protected readonly itemCount = computed(() => this.lines().reduce((n, l) => n + l.quantity, 0));
   /** Cash tendered below the total can't be accepted; leaving the box empty means exact payment. */
@@ -82,7 +96,7 @@ export class Pos implements OnInit {
     return Math.round((received - this.totals().total) * 100) / 100;
   });
   protected readonly canCheckout = computed(
-    () => this.lines().length > 0 && !this.discountInvalid() && !this.paymentInvalid() && !this.submitting(),
+    () => this.lines().length > 0 && !this.discountInvalid() && !this.paymentInvalid() && !this.pointsInvalid() && !this.submitting(),
   );
   protected readonly lineTotal = lineTotal;
 
@@ -111,6 +125,7 @@ export class Pos implements OnInit {
 
   protected pickCustomer(customer: Customer): void {
     this.customer.set(customer);
+    this.pointsToRedeem.set(0);
     this.customerSearch.setValue('', { emitEvent: false });
     this.customerMatches.set([]);
   }
@@ -176,6 +191,16 @@ export class Pos implements OnInit {
     this.discountPercent.set(Number.isNaN(value) ? 0 : value);
   }
 
+  protected removeCustomer(): void {
+    this.customer.set(null);
+    this.pointsToRedeem.set(0);
+  }
+
+  protected onPointsInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).valueAsNumber;
+    this.pointsToRedeem.set(Number.isNaN(value) ? 0 : value);
+  }
+
   protected onAmountReceivedInput(event: Event): void {
     const value = (event.target as HTMLInputElement).valueAsNumber;
     this.amountReceived.set(Number.isNaN(value) ? null : value);
@@ -216,6 +241,7 @@ export class Pos implements OnInit {
         paymentMethod: this.paymentMethod(),
         ...(this.paymentMethod() === 'Cash' && this.amountReceived() !== null ? { amountPaid: this.amountReceived()! } : {}),
         ...(this.customer() ? { customerId: this.customer()!.id } : {}),
+        ...(this.customer() && this.pointsToRedeem() > 0 ? { loyaltyPointsToRedeem: this.pointsToRedeem() } : {}),
       })
       .subscribe({
         next: (sale) => {
@@ -225,6 +251,7 @@ export class Pos implements OnInit {
           this.discountPercent.set(0);
           this.amountReceived.set(null);
           this.customer.set(null);
+          this.pointsToRedeem.set(0);
           this.loadProducts(); // refresh stock figures
         },
         error: (err: unknown) => {
@@ -246,6 +273,7 @@ export class Pos implements OnInit {
     this.paymentMethod.set('Cash');
     this.amountReceived.set(null);
     this.customer.set(null);
+    this.pointsToRedeem.set(0);
     this.customerSearch.setValue('', { emitEvent: false });
     this.customerMatches.set([]);
     this.checkoutError.set(null);

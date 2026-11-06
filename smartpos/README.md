@@ -129,6 +129,7 @@ behaviour (concurrency, generated SQL) was verified.
 | `Pos__MaxDiscountPercent` | no | 100 | Highest discount a bill may carry |
 | `Cors__AllowedOrigins__0` | no | `http://localhost:4200` in Development | Browser origins allowed to call the API |
 | `Loyalty__SpendPerPoint` | no | 100 | Amount spent to earn one loyalty point |
+| `Loyalty__PointValue` | no | 1 | What one point takes off a bill when redeemed (0.01 or more, at most 2 decimals) |
 | `App__WebBaseUrl` | for emailed links | empty (`http://localhost:4200` in Development) | Public address of the web app, used to build the verification link |
 | `Email__Smtp__Host` / `__Port` / `__UseSsl` / `__User` / `__Password` / `__From` | for real email | empty | SMTP server for sending verification emails; keep the password in user-secrets |
 | `Email__LogMessages` | no | true in Development | With no SMTP host, print each email (including its link) to the API log |
@@ -177,7 +178,7 @@ A bill that has a **customer attached** earns
 points = floor( bill total ÷ Loyalty:SpendPerPoint )
 ```
 
-- **Bill total** is what the customer actually pays: after the discount (the `TotalAmount` on the bill).
+- **Bill total** is what the customer actually pays: after the discount and any points redeemed (the `TotalAmount` on the bill).
 - **`Loyalty:SpendPerPoint`** is a setting (default **100**, so 1 point per ₹100). It must be at least 1.
 - **Always rounded down**: a part-point is never awarded. With the default: ₹99.99 → 0 points, ₹100.00 → 1,
   ₹456.75 → 4, ₹3,076.50 → 30.
@@ -187,8 +188,30 @@ points = floor( bill total ÷ Loyalty:SpendPerPoint )
   so two bills for one customer at the same moment cannot lose points. The balance is therefore always the sum of
   its bills' points, and can be re-derived from them.
 - The POS uses the same formula to show "earns N on this bill" before you complete the sale.
-- **Not built yet:** spending (redeeming) points, expiry, tiers, and reversing points when a bill is cancelled
-  (there is no cancel feature yet).
+
+### Redeeming points
+
+With a customer on the bill, the till shows **Use points** (and **Use max**). Each point takes
+`Loyalty:PointValue` off the bill (default **1**, so 100 points = ₹100 off).
+
+```
+amount due = subtotal - discount - (points used x point value)
+```
+
+- Points come off **after** the percentage discount, in whole points, and can pay the whole bill but never more:
+  at most `min(balance, floor(amount after discount ÷ point value))`. The server refuses anything above that
+  (400 with the limit in the message), and points without a customer.
+- The bill then **earns on what is left to pay**: a ₹500 bill using 4 points is ₹496 due and earns 4.
+- The redemption is shared across the lines like the discount (each line's `DiscountAmount` is its share of
+  both), so line totals still add up to the bill and product profit reports count the points as a cost.
+- The bill stores `LoyaltyPointsRedeemed` and `LoyaltyRedemptionAmount`; the balance changes once, inside the sale's
+  transaction, by `earned - redeemed`, and only if the balance still covers the points
+  (`WHERE LoyaltyPoints >= redeemed`). If another till spent them first, the sale rolls back with **409**: two tills
+  can never spend the same points. Tested on PostgreSQL with 10 simultaneous redemptions of one balance: exactly 1
+  succeeded.
+- The balance is always `sum(earned) - sum(redeemed)` over the customer's bills.
+- The daily sales report has a `loyaltyRedemptionAmount` column, so subtotal - discount - redemption = total on every day.
+- **Not built yet:** expiry, tiers, and reversing points when a bill is cancelled (there is no cancel feature yet).
 
 The demo history uses the same rule (`LoyaltyRules.PointsEarned`), so fabricated customers' balances are exactly
 what their fabricated bills earned.
@@ -239,7 +262,7 @@ dotnet run --project src/SmartPOS.API -- reset-password --email you@example.com
   `Pending`), and reports ignore anything but `Completed`, but nothing sets them yet.
 - **No staff accounts.** One login per shop owner; there is no way to give an employee their own login or limit what they can do. Currency and time zone are global settings, not per shop.
 - **Email is verified by link but not enforced**: an unconfirmed account can use everything. There is **no self-service password reset or change-password screen** yet (use the `reset-password` command above in Development). Phone numbers are only format-checked.
-- Loyalty points are earned but cannot be **spent** yet (no redemption, expiry or tiers), and are not reversed on a cancelled bill because there is no cancel feature.
+- Loyalty points have no expiry or tiers, and are not reversed on a cancelled bill because there is no cancel feature.
 - **No tax.** Bills carry no tax (GST/VAT); adding it back would need a new migration and a tax line on the
   POS and the bill. Sale-level discount only (it is split across lines, but there are no per-line
   discounts or promotions).

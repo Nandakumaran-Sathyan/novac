@@ -40,6 +40,13 @@ public sealed class CreateSaleRequest
     /// <summary>Optional customer for the bill; must belong to the same shop.</summary>
     [Range(1, int.MaxValue)]
     public int? CustomerId { get; init; }
+
+    /// <summary>
+    /// Whole loyalty points to spend on this bill (needs a customer). The server values them, checks the balance
+    /// and takes them off after the discount; it refuses more than the balance or more than the amount due.
+    /// </summary>
+    [Range(0, 1_000_000)]
+    public int LoyaltyPointsToRedeem { get; init; }
 }
 
 public sealed record SaleItemDto(
@@ -63,6 +70,8 @@ public sealed record SaleDto(
     SaleStatus Status,
     PaymentMethod PaymentMethod,
     int LoyaltyPointsEarned,
+    int LoyaltyPointsRedeemed,
+    decimal LoyaltyRedemptionAmount,
     int? CustomerLoyaltyPoints,
     decimal Subtotal,
     decimal DiscountPercent,
@@ -102,4 +111,5 @@ public sealed record PosSettingsDto(
     string CurrencyCode,
     string TimeZoneId,
     decimal MaxDiscountPercent,
-    decimal LoyaltySpendPerPoint);
+    decimal LoyaltySpendPerPoint,
+    decimal LoyaltyPointValue);

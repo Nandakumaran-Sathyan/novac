@@ -224,6 +224,13 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                     b.Property<int>("LoyaltyPointsEarned")
                         .HasColumnType("integer");
 
+                    b.Property<int>("LoyaltyPointsRedeemed")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("LoyaltyRedemptionAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -268,6 +275,10 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Sales_DiscountPercent_Range", "\"DiscountPercent\" >= 0 AND \"DiscountPercent\" <= 100");
 
                             t.HasCheckConstraint("CK_Sales_LoyaltyPointsEarned_NonNegative", "\"LoyaltyPointsEarned\" >= 0");
+
+                            t.HasCheckConstraint("CK_Sales_LoyaltyPointsRedeemed_NonNegative", "\"LoyaltyPointsRedeemed\" >= 0");
+
+                            t.HasCheckConstraint("CK_Sales_LoyaltyRedemptionAmount_NonNegative", "\"LoyaltyRedemptionAmount\" >= 0");
 
                             t.HasCheckConstraint("CK_Sales_TotalAmount_NonNegative", "\"TotalAmount\" >= 0");
                         });

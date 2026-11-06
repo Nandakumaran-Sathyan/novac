@@ -22,7 +22,7 @@ public class Sale
     public decimal Subtotal { get; set; }
     public decimal DiscountPercent { get; set; }
     public decimal DiscountAmount { get; set; }
-    /// <summary>Final bill amount: subtotal − discount.</summary>
+    /// <summary>Final bill amount: subtotal − discount − loyalty redemption.</summary>
     public decimal TotalAmount { get; set; }
 
     public PaymentMethod PaymentMethod { get; set; }
@@ -33,6 +33,10 @@ public class Sale
 
     /// <summary>Loyalty points this bill earned for its customer (0 for walk-ins). Kept so the balance can always be re-derived.</summary>
     public int LoyaltyPointsEarned { get; set; }
+    /// <summary>Loyalty points the customer spent on this bill.</summary>
+    public int LoyaltyPointsRedeemed { get; set; }
+    /// <summary>What those points took off the bill (points × the point value at the time of sale).</summary>
+    public decimal LoyaltyRedemptionAmount { get; set; }
 
     public SaleStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }

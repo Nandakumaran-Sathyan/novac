@@ -129,4 +129,49 @@ public class SaleCalculatorTests
     [InlineData(100.01)]
     public void Discount_outside_0_to_100_is_rejected(decimal discount) =>
         Assert.Throws<BusinessRuleException>(() => SaleCalculator.Calculate([new(10m, 1)], discount));
+
+    [Fact]
+    public void Points_come_off_after_the_discount_and_are_shared_across_the_lines()
+    {
+        // 91.00 + 120.00 + 29.97 = 240.97; 10% = 24.10 → 216.87 due; 50.00 of points → 166.87.
+        var totals = SaleCalculator.Calculate([new(45.50m, 2), new(120m, 1), new(9.99m, 3)], 10, redemptionAmount: 50m);
+
+        Assert.Equal(24.10m, totals.DiscountAmount);
+        Assert.Equal(50m, totals.RedemptionAmount);
+        Assert.Equal(166.87m, totals.Total);
+        Assert.Equal(50m, totals.LineRedemptions.Sum());
+        Assert.Equal(totals.Total, totals.LineTotals.Sum());
+    }
+
+    [Fact]
+    public void Line_amounts_still_add_up_with_points_redeemed()
+    {
+        var lines = new SaleLineInput[] { new(33.33m, 3), new(10.01m, 7), new(7.77m, 1), new(0.01m, 1), new(1999.99m, 2) };
+        foreach (var discount in new[] { 0m, 12.5m, 100m })
+        {
+            var due = SaleCalculator.Calculate(lines, discount).Total;
+            foreach (var redemption in new[] { 0m, 0.01m, 17.33m, due }.Where(r => r <= due))
+            {
+                var totals = SaleCalculator.Calculate(lines, discount, redemption);
+                Assert.Equal(totals.RedemptionAmount, totals.LineRedemptions.Sum());
+                Assert.Equal(totals.DiscountAmount, totals.LineDiscounts.Sum());
+                Assert.Equal(totals.Total, totals.LineTotals.Sum());
+                Assert.Equal(totals.Subtotal - totals.DiscountAmount - totals.RedemptionAmount, totals.Total);
+                Assert.All(totals.LineTotals, t => Assert.True(t >= 0));
+            }
+        }
+    }
+
+    [Fact]
+    public void Points_can_pay_the_whole_bill_but_not_more()
+    {
+        Assert.Equal(0m, SaleCalculator.Calculate([new(100m, 1)], 20, redemptionAmount: 80m).Total);
+        Assert.Throws<BusinessRuleException>(() => SaleCalculator.Calculate([new(100m, 1)], 20, redemptionAmount: 80.01m));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0.005)]
+    public void Redemption_must_be_non_negative_whole_cents(decimal redemption) =>
+        Assert.Throws<BusinessRuleException>(() => SaleCalculator.Calculate([new(100m, 1)], 0, redemption));
 }

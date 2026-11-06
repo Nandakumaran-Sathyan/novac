@@ -27,7 +27,9 @@
           <div><dt>Date</dt><dd>{{ s.createdAt | date: 'MMM d, y, h:mm a' }}</dd></div>
           <div><dt>Cashier</dt><dd>{{ s.cashierName }}</dd></div>
           @if (s.customerName) { <div><dt>Customer</dt><dd>{{ s.customerName }}</dd></div> }
-          @if (s.customerName) { <div><dt>Loyalty</dt><dd>+{{ s.loyaltyPointsEarned }} pts (balance {{ s.customerLoyaltyPoints }})</dd></div> }
+          @if (s.customerName) {
+            <div><dt>Loyalty</dt><dd>+{{ s.loyaltyPointsEarned }} pts@if (s.loyaltyPointsRedeemed > 0) {, {{ s.loyaltyPointsRedeemed }} used} (balance {{ s.customerLoyaltyPoints }})</dd></div>
+          }
           <div><dt>Payment</dt><dd>{{ s.paymentMethod }}</dd></div>
           <div><dt>Status</dt><dd>{{ s.status }}</dd></div>
         </dl>
@@ -35,7 +37,7 @@
 
       <table class="table invoice-table">
         <thead>
-          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num hide-sm">Discount</th><th scope="col" class="num">Amount</th></tr>
+          <tr><th scope="col">Item</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Unit price</th><th scope="col" class="num hide-sm">{{ s.loyaltyRedemptionAmount > 0 ? 'Discount + points' : 'Discount' }}</th><th scope="col" class="num">Amount</th></tr>
         </thead>
         <tbody>
           @for (item of s.items; track item.id) {
@@ -54,6 +56,9 @@
         <div><dt>Subtotal</dt><dd>{{ s.subtotal | money }}</dd></div>
         @if (s.discountAmount > 0) {
           <div><dt>Discount ({{ s.discountPercent }}%)</dt><dd>−{{ s.discountAmount | money }}</dd></div>
+        }
+        @if (s.loyaltyRedemptionAmount > 0) {
+          <div><dt>Points redeemed ({{ s.loyaltyPointsRedeemed }})</dt><dd>−{{ s.loyaltyRedemptionAmount | money }}</dd></div>
         }
         <div class="grand"><dt>Total</dt><dd>{{ s.totalAmount | money }}</dd></div>
         <div><dt>Paid ({{ s.paymentMethod }})</dt><dd>{{ s.amountPaid | money }}</dd></div>

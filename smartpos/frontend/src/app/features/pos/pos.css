@@ -113,3 +113,6 @@ kbd {
 .points { font-size: 0.8125rem; font-weight: 600; color: var(--color-primary-text); }
 .points .muted { font-weight: 400; }
 .complete-points { margin: 4px 0 0; color: var(--color-primary-text); }
+.redeem { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.redeem-row { display: flex; gap: 8px; align-items: center; }
+.redeem-row .input { flex: 1; min-width: 0; }

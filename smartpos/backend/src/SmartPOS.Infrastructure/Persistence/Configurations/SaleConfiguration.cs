@@ -15,6 +15,8 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
             t.HasCheckConstraint("CK_Sales_ChangeAmount_NonNegative", "\"ChangeAmount\" >= 0");
             t.HasCheckConstraint("CK_Sales_AmountPaid_NonNegative", "\"AmountPaid\" >= 0");
             t.HasCheckConstraint("CK_Sales_LoyaltyPointsEarned_NonNegative", "\"LoyaltyPointsEarned\" >= 0");
+            t.HasCheckConstraint("CK_Sales_LoyaltyPointsRedeemed_NonNegative", "\"LoyaltyPointsRedeemed\" >= 0");
+            t.HasCheckConstraint("CK_Sales_LoyaltyRedemptionAmount_NonNegative", "\"LoyaltyRedemptionAmount\" >= 0");
         });
 
         builder.Property(s => s.BillNumber).HasMaxLength(50).IsRequired();
@@ -22,6 +24,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.DiscountPercent).HasPrecision(5, 2);
         builder.Property(s => s.DiscountAmount).HasPrecision(12, 2);
         builder.Property(s => s.TotalAmount).HasPrecision(12, 2);
+        builder.Property(s => s.LoyaltyRedemptionAmount).HasPrecision(12, 2);
         builder.Property(s => s.AmountPaid).HasPrecision(12, 2);
         builder.Property(s => s.ChangeAmount).HasPrecision(12, 2);
         builder.Property(s => s.PaymentMethod).HasConversion<string>().HasMaxLength(30);

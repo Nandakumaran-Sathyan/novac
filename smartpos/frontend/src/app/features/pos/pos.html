@@ -57,6 +57,7 @@
         <p class="muted">Paid by {{ sale.paymentMethod }}@if (sale.customerName) { · {{ sale.customerName }} }</p>
         @if (sale.customerName) {
           <p class="complete-points"><strong>+{{ sale.loyaltyPointsEarned }} loyalty {{ sale.loyaltyPointsEarned === 1 ? 'point' : 'points' }}</strong>
+            @if (sale.loyaltyPointsRedeemed > 0) { <span> · {{ sale.loyaltyPointsRedeemed }} used ({{ sale.loyaltyRedemptionAmount | money }} off)</span> }
             <span class="muted"> · balance {{ sale.customerLoyaltyPoints }}</span></p>
         }
         @if (sale.changeAmount > 0) {
@@ -107,8 +108,29 @@
             <div class="customer-chip">
               <span><strong>{{ c.name }}</strong> <span class="muted mono">{{ c.phone }}</span><br>
                 <span class="points">{{ c.loyaltyPoints }} points<span class="muted"> · earns {{ pointsToEarn() }} on this bill</span></span></span>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="customer.set(null)" [attr.aria-label]="'Remove customer ' + c.name">Remove</button>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="removeCustomer()" [attr.aria-label]="'Remove customer ' + c.name">Remove</button>
             </div>
+            @if (c.loyaltyPoints > 0 && pointValue() > 0) {
+              <div class="redeem">
+                <label for="redeem">Use points <span class="muted">({{ pointValue() | money }} each)</span></label>
+                <div class="redeem-row">
+                  <input id="redeem" type="number" class="input" min="0" [max]="maxPoints()" step="1" inputmode="numeric"
+                         [value]="pointsToRedeem()" (input)="onPointsInput($event)" [attr.aria-invalid]="pointsInvalid()"
+                         aria-describedby="redeem-help">
+                  <button type="button" class="btn btn-secondary btn-sm" (click)="pointsToRedeem.set(maxPoints())"
+                          [disabled]="maxPoints() === 0 || pointsToRedeem() === maxPoints()">Use max</button>
+                </div>
+                <span id="redeem-help" class="hint" [class.field-error]="pointsInvalid()">
+                  @if (pointsInvalid()) {
+                    Whole points only, at most {{ maxPoints() }} on this bill.
+                  } @else if (pointsToRedeem() > 0) {
+                    Takes {{ totals().pointsAmount | money }} off · up to {{ maxPoints() }} on this bill
+                  } @else {
+                    Up to {{ maxPoints() }} on this bill
+                  }
+                </span>
+              </div>
+            }
           } @else {
             <label for="customer-search">Customer <span class="muted">(optional)</span></label>
             <input id="customer-search" type="search" class="input" autocomplete="off" placeholder="Search name or phone" [formControl]="customerSearch">
@@ -158,6 +180,9 @@
         <dl class="totals">
           <div><dt>Subtotal</dt><dd>{{ totals().subtotal | money }}</dd></div>
           <div><dt>Discount</dt><dd>−{{ totals().discountAmount | money }}</dd></div>
+          @if (totals().pointsAmount > 0) {
+            <div><dt>Points ({{ pointsToRedeem() }})</dt><dd>−{{ totals().pointsAmount | money }}</dd></div>
+          }
           <div class="grand"><dt>Total</dt><dd>{{ totals().total | money }}</dd></div>
         </dl>
 

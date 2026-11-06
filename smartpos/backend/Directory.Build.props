@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NU1900: the vulnerability feed couldn't be downloaded (offline). Real findings, NU1901-NU1904, still fail the build. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1900</WarningsNotAsErrors>
     <!-- CS1591: missing XML comments on public members (XML docs are generated for Swagger). -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

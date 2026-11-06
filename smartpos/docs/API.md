@@ -88,7 +88,18 @@ The discount is then shared out across the lines in proportion to their value, t
 
 A bill with a `customerId` earns `floor(totalAmount / Loyalty:SpendPerPoint)` points (default 100): ₹99.99 → 0, ₹100 → 1,
 ₹456.75 → 4. The sale response carries `loyaltyPointsEarned` and `customerLoyaltyPoints` (the balance afterwards; null for a
-walk-in); `GET /api/settings/pos` returns `loyaltySpendPerPoint`. The balance is updated atomically in the sale's transaction.
+walk-in); `GET /api/settings/pos` returns `loyaltySpendPerPoint` and `loyaltyPointValue`. The balance is updated atomically in the sale's transaction.
+
+To **redeem**, send `loyaltyPointsToRedeem` (whole points, needs `customerId`) with `POST /api/sales`. Each point is worth
+`Loyalty:PointValue` (default 1) and comes off after the discount; points are then earned on what is left to pay. The
+response adds `loyaltyPointsRedeemed` and `loyaltyRedemptionAmount`.
+
+| Case | Result |
+|---|---|
+| Points without a customer | 400 |
+| More than the customer's balance | 400 "The customer has only N points." |
+| Worth more than the amount due after the discount | 400 "At most N points can be used on this bill ..." |
+| Another bill spent the points a moment earlier | 409, nothing recorded |
 
 ## Payment
 

@@ -28,7 +28,11 @@ export class CustomerList implements OnInit {
   private readonly settings = inject(SettingsService);
   protected readonly rateText = () => {
     const rate = this.settings.settings()?.loyaltySpendPerPoint;
-    return rate ? `1 point for every ${rate} spent, rounded down` : 'points are switched off';
+    const value = this.settings.settings()?.loyaltyPointValue;
+    if (!rate) {
+      return 'points are switched off';
+    }
+    return `1 point for every ${rate} spent, rounded down` + (value ? `; each point takes ${value.toFixed(2)} off a later bill` : '');
   };
   private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(NonNullableFormBuilder);

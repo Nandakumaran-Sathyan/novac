@@ -138,7 +138,7 @@ export interface SaleItem {
   productName: string;
   quantity: number;
   unitPrice: number;
-  /** This line's share of the sale discount. */
+  /** This line's share of the bill's reductions: the sale discount plus any points redeemed. */
   discountAmount: number;
   /** Final amount for the line: unit price × quantity − discount. */
   lineTotal: number;
@@ -156,6 +156,9 @@ export interface Sale {
   paymentMethod: PaymentMethod;
   /** Points this bill earned for its customer (0 for walk-ins). */
   loyaltyPointsEarned: number;
+  /** Points the customer spent on this bill, and what they took off it. */
+  loyaltyPointsRedeemed: number;
+  loyaltyRedemptionAmount: number;
   /** The customer's balance right now, or null for a walk-in. */
   customerLoyaltyPoints: number | null;
   subtotal: number;
@@ -186,6 +189,8 @@ export interface CreateSaleRequest {
   /** Omit for "exactly the total". Cash may exceed the total; the difference is change. */
   amountPaid?: number;
   customerId?: number;
+  /** Whole points to spend on the bill; needs a customer. The server checks the balance and the amount due. */
+  loyaltyPointsToRedeem?: number;
 }
 
 export interface PosSettings {
@@ -196,6 +201,8 @@ export interface PosSettings {
   maxDiscountPercent: number;
   /** Amount spent to earn one loyalty point. */
   loyaltySpendPerPoint: number;
+  /** What one point is worth when redeemed. */
+  loyaltyPointValue: number;
 }
 
 export interface DashboardSummary {
@@ -280,6 +287,7 @@ export interface DailySalesRow {
   transactionCount: number;
   subtotal: number;
   discountAmount: number;
+  loyaltyRedemptionAmount: number;
   total: number;
 }
 

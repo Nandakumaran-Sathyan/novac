@@ -13,6 +13,8 @@ export interface CartLine {
 export interface CartTotals {
   subtotal: number;
   discountAmount: number;
+  /** Value of the loyalty points used, taken off after the discount. */
+  pointsAmount: number;
   total: number;
 }
 
@@ -21,14 +23,30 @@ export interface CartTotals {
  * Works in integer cents and basis points so results match the server's decimal arithmetic
  * exactly, including half-away-from-zero rounding. The server's figures are still authoritative.
  */
-export function calculateTotals(lines: readonly CartLine[], discountPercent: number): CartTotals {
+export function calculateTotals(lines: readonly CartLine[], discountPercent: number, pointsAmount = 0): CartTotals {
   const subtotalCents = lines.reduce((sum, line) => sum + toCents(line.unitPrice) * line.quantity, 0);
   const discountCents = roundDiv(subtotalCents * toBasisPoints(discountPercent), 10_000);
+  const pointsCents = Math.min(Math.max(toCents(pointsAmount), 0), subtotalCents - discountCents);
   return {
     subtotal: subtotalCents / 100,
     discountAmount: discountCents / 100,
-    total: (subtotalCents - discountCents) / 100,
+    pointsAmount: pointsCents / 100,
+    total: (subtotalCents - discountCents - pointsCents) / 100,
   };
+}
+
+/** Same as the server's LoyaltyRules.RedemptionValue: points × point value, in whole cents. */
+export function pointsValue(points: number, pointValue: number): number {
+  return (Math.trunc(points) * toCents(pointValue)) / 100;
+}
+
+/** Same as LoyaltyRules.MaxRedeemable: limited by the balance and by the amount still due, in whole points. */
+export function maxRedeemablePoints(balance: number, amountDue: number, pointValue: number): number {
+  const valueCents = toCents(pointValue);
+  if (balance <= 0 || valueCents <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(Math.trunc(balance), Math.floor(toCents(amountDue) / valueCents)));
 }
 
 export function lineTotal(line: CartLine): number {

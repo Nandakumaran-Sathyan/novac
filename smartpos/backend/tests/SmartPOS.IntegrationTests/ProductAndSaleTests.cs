@@ -485,10 +485,117 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
     }
 
     [Fact]
-    public async Task Pos_settings_tell_the_till_the_earning_rate()
+    public async Task Pos_settings_tell_the_till_the_earning_rate_and_point_value()
     {
         var user = await factory.UserClientAsync();
         var settings = await user.GetFromJsonAsync<PosSettingsDto>("/api/settings/pos", SmartPosApiFactory.Json);
         Assert.Equal(100m, settings!.LoyaltySpendPerPoint);
+        Assert.Equal(1m, settings.LoyaltyPointValue);
+    }
+
+    private static async Task<Application.Customers.CustomerDto> CustomerWithPointsAsync(HttpClient user, string phone, ProductDto earner, int bills)
+    {
+        var customer = (await (await user.PostAsJsonAsync("/api/customers", new { name = "Points Spender", phone }))
+            .Content.ReadFromJsonAsync<Application.Customers.CustomerDto>(SmartPosApiFactory.Json))!;
+        for (var i = 0; i < bills; i++)
+        {
+            var r = await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = earner.Id, quantity = 1 } }, customerId = customer.Id });
+            Assert.True(r.IsSuccessStatusCode, await r.Content.ReadAsStringAsync());
+        }
+        return (await user.GetFromJsonAsync<Application.Customers.CustomerDto>($"/api/customers/{customer.Id}", SmartPosApiFactory.Json))!;
+    }
+
+    private static Task<int> PointsAsync(HttpClient user, int customerId) =>
+        user.GetFromJsonAsync<Application.Customers.CustomerDto>($"/api/customers/{customerId}", SmartPosApiFactory.Json)
+            .ContinueWith(t => t.Result!.LoyaltyPoints);
+
+    [Fact]
+    public async Task Redeemed_points_come_off_the_bill_after_the_discount_and_the_rest_earns_points()
+    {
+        var user = await factory.UserClientAsync();
+        var earner = await CreateProductAsync(user, "RED-EARN", 1000m, 10);
+        var product = await CreateProductAsync(user, "RED-1", 150m, 10);
+        var customer = await CustomerWithPointsAsync(user, "9000000901", earner, 1);
+        Assert.Equal(10, customer.LoyaltyPoints);
+
+        // 2 × 150 = 300.00, 10% off = 270.00, minus 4 points (4.00) = 266.00 → earns 2.
+        var response = await user.PostAsJsonAsync("/api/sales", new
+        {
+            items = new[] { new { productId = product.Id, quantity = 2 } }, discountPercent = 10, customerId = customer.Id, loyaltyPointsToRedeem = 4
+        });
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        var sale = (await response.Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
+
+        Assert.Equal(30m, sale.DiscountAmount);
+        Assert.Equal(4, sale.LoyaltyPointsRedeemed);
+        Assert.Equal(4m, sale.LoyaltyRedemptionAmount);
+        Assert.Equal(266m, sale.TotalAmount);
+        Assert.Equal(266m, sale.AmountPaid);
+        Assert.Equal(2, sale.LoyaltyPointsEarned);
+        Assert.Equal(sale.DiscountAmount + sale.LoyaltyRedemptionAmount, sale.Items.Sum(i => i.DiscountAmount));
+        Assert.Equal(sale.TotalAmount, sale.Items.Sum(i => i.LineTotal));
+        Assert.Equal(10 - 4 + 2, sale.CustomerLoyaltyPoints);
+        Assert.Equal(8, await PointsAsync(user, customer.Id));
+
+        var report = (await user.GetFromJsonAsync<Application.Reports.DailySalesReport>("/api/reports/daily-sales", SmartPosApiFactory.Json))!;
+        Assert.True(report.Days.Sum(d => d.LoyaltyRedemptionAmount) >= 4m);
+        Assert.All(report.Days, d => Assert.Equal(d.Subtotal - d.DiscountAmount - d.LoyaltyRedemptionAmount, d.Total));
+    }
+
+    [Fact]
+    public async Task Points_can_pay_for_the_whole_bill()
+    {
+        var user = await factory.UserClientAsync();
+        var earner = await CreateProductAsync(user, "RED-EARN2", 1000m, 10);
+        var product = await CreateProductAsync(user, "RED-2", 7.00m, 10);
+        var customer = await CustomerWithPointsAsync(user, "9000000902", earner, 1);
+
+        var sale = (await (await user.PostAsJsonAsync("/api/sales", new
+        {
+            items = new[] { new { productId = product.Id, quantity = 1 } }, paymentMethod = "Card", customerId = customer.Id, loyaltyPointsToRedeem = 7
+        })).Content.ReadFromJsonAsync<SaleDto>(SmartPosApiFactory.Json))!;
+
+        Assert.Equal(0m, sale.TotalAmount);
+        Assert.Equal(0m, sale.AmountPaid);
+        Assert.Equal(0, sale.LoyaltyPointsEarned);
+        Assert.Equal(3, await PointsAsync(user, customer.Id));
+    }
+
+    [Fact]
+    public async Task Redeeming_is_refused_without_a_customer_above_the_balance_or_above_the_amount_due()
+    {
+        var user = await factory.UserClientAsync();
+        var earner = await CreateProductAsync(user, "RED-EARN3", 1000m, 10);
+        var product = await CreateProductAsync(user, "RED-3", 5.00m, 10);
+        var customer = await CustomerWithPointsAsync(user, "9000000903", earner, 1);
+        var item = new[] { new { productId = product.Id, quantity = 1 } };
+
+        var noCustomer = await user.PostAsJsonAsync("/api/sales", new { items = item, loyaltyPointsToRedeem = 1 });
+        var overBalance = await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = earner.Id, quantity = 1 } }, customerId = customer.Id, loyaltyPointsToRedeem = 11 });
+        var overDue = await user.PostAsJsonAsync("/api/sales", new { items = item, customerId = customer.Id, loyaltyPointsToRedeem = 6 });
+        var negative = await user.PostAsJsonAsync("/api/sales", new { items = item, customerId = customer.Id, loyaltyPointsToRedeem = -1 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, noCustomer.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, overBalance.StatusCode);
+        Assert.Contains("only 10 points", await overBalance.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, overDue.StatusCode);
+        Assert.Contains("At most 5 points", await overDue.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, negative.StatusCode);
+        Assert.Equal(10, await PointsAsync(user, customer.Id));
+        Assert.Equal(10, (await user.GetFromJsonAsync<ProductDto>($"/api/products/{product.Id}", SmartPosApiFactory.Json))!.StockQuantity);
+    }
+
+    [Fact]
+    public async Task A_sale_that_fails_does_not_spend_the_points()
+    {
+        var user = await factory.UserClientAsync();
+        var earner = await CreateProductAsync(user, "RED-EARN4", 1000m, 10);
+        var scarce = await CreateProductAsync(user, "RED-4", 50m, 1);
+        var customer = await CustomerWithPointsAsync(user, "9000000904", earner, 1);
+
+        var oversell = await user.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = scarce.Id, quantity = 2 } }, customerId = customer.Id, loyaltyPointsToRedeem = 5 });
+
+        Assert.Equal(HttpStatusCode.Conflict, oversell.StatusCode);
+        Assert.Equal(10, await PointsAsync(user, customer.Id));
     }
 }
