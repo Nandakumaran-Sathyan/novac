@@ -9,10 +9,10 @@ public interface IAuthService
 
     Task<UserDto> GetCurrentAsync(CancellationToken cancellationToken);
 
-    /// <summary>Marks the email as verified if the token from the emailed link is valid and unexpired.</summary>
+    /// <summary>Marks the signed-in user's email as verified if the code is right, unexpired and within the try limit.</summary>
     Task VerifyEmailAsync(VerifyEmailRequest request, CancellationToken cancellationToken);
 
-    /// <summary>Sends the signed-in user a fresh verification link (replacing any earlier one).</summary>
+    /// <summary>Sends the signed-in user a new verification code, replacing any earlier one.</summary>
     Task ResendVerificationAsync(CancellationToken cancellationToken);
 }
 

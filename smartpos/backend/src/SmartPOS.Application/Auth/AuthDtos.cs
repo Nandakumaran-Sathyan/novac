@@ -49,8 +49,9 @@ public sealed record UserDto(
 
 public sealed class VerifyEmailRequest
 {
-    [Required, StringLength(200, MinimumLength = 20)]
-    public string Token { get; init; } = string.Empty;
+    /// <summary>The 6-digit code from the verification email.</summary>
+    [Required, RegularExpression(EmailVerificationRules.CodePattern, ErrorMessage = "Enter the 6-digit code from the email.")]
+    public string Code { get; init; } = string.Empty;
 }
 
 public sealed record LoginResponse(string AccessToken, DateTime ExpiresAt, UserDto User);

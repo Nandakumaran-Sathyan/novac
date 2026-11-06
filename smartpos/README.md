@@ -130,9 +130,8 @@ behaviour (concurrency, generated SQL) was verified.
 | `Cors__AllowedOrigins__0` | no | `http://localhost:4200` in Development | Browser origins allowed to call the API |
 | `Loyalty__SpendPerPoint` | no | 100 | Amount spent to earn one loyalty point |
 | `Loyalty__PointValue` | no | 1 | What one point takes off a bill when redeemed (0.01 or more, at most 2 decimals) |
-| `App__WebBaseUrl` | for emailed links | empty (`http://localhost:4200` in Development) | Public address of the web app, used to build the verification link |
-| `Email__Smtp__Host` / `__Port` / `__UseSsl` / `__User` / `__Password` / `__From` | for real email | empty | SMTP server for sending verification emails; keep the password in user-secrets |
-| `Email__LogMessages` | no | true in Development | With no SMTP host, print each email (including its link) to the API log |
+| `Email__Smtp__Host` / `__Port` / `__UseSsl` / `__User` / `__Password` / `__From` | for real email | empty (Mailpit on `localhost:1025` in Development) | SMTP server for the verification codes; keep the password in user-secrets |
+| `Email__LogMessages` | no | false | With no SMTP host, print each email (including its code) to the API log instead |
 | `Database__SeedSampleData` | no | true in Development | Sample catalogue for each newly registered shop |
 | `Database__SeedDemoHistory` / `Database__DemoHistoryDays` | no | true / 90 in Development | **Fabricated** bills, customers and stock movements for the sample shop, so dashboards have data. Never enable in production |
 | `RateLimiting__LoginPermitsPerMinute` | no | 10 | Login and registration attempts per IP per minute |
@@ -228,14 +227,33 @@ At sign-up the email address goes through two stages, using free services only:
      for typos". Only the **domain** is sent, never the part before the `@`. Answers are cached for an hour.
    - If the lookup itself fails (no internet, timeout), sign-up is **allowed** and a warning is logged: a DNS
      hiccup should never lock a real person out.
-2. **Proof they own it.** After sign-up a single-use link is emailed (`/verify-email?token=…`, valid 24 hours).
-   Only a SHA-256 hash of the secret is stored, a new link replaces the old one, and the app shows a banner with
-   **Resend link** until the address is confirmed. Verification does **not** block using the app yet.
+2. **Proof they own it: a 6-digit code.** Sign-up emails a random code (`RandomNumberGenerator`), and the web app
+   shows a **Check your email** page. **Until the code is entered, every API endpoint except sign-in, `/auth/me`,
+   `verify-email` and `resend-verification` answers 403 "Email not verified"**, and the web app sends the owner
+   back to the code page. Accounts that existed before this get no code automatically: they sign in and press
+   **Send a new code**.
+   - Only an **HMAC-SHA256** of `userId:code` is stored, keyed from the JWT signing key (HKDF). A plain hash of
+     a 6-digit code could be reversed by trying all million codes; this can't without the key, and one user's
+     code is useless for another.
+   - The code **expires after 5 minutes** and allows **5 tries**. Each try is counted in the database before the
+     code is checked, in one conditional statement, so parallel guesses can't get past five. After that, even the
+     right code is refused until a new one is sent.
+   - **Send a new code** works once a minute (429 otherwise), replaces the old code and resets the tries.
+   - Verifying takes effect on the next request with the same sign-in token: the API reads the user from the
+     database on every request.
 
-Sending the email: set `Email:Smtp:*` to any SMTP server. Free options are Gmail (an app password), the free
-tiers of Brevo or Mailjet, or a local [Mailpit](https://mailpit.axllent.org) for testing. With no SMTP host, in
-Development the full email (with its link) is printed to the API log instead, which is how you verify an
-account locally. In any other environment with no SMTP host, nothing is sent and nothing sensitive is logged.
+Sending the email: in Development the API sends to **[Mailpit](https://mailpit.axllent.org)**, a local mail
+server that delivers nothing to the internet and needs no account:
+
+```bash
+brew install mailpit
+mailpit                      # SMTP on localhost:1025, inbox at http://localhost:8025
+```
+
+Keep it running while you register or sign in, and read the codes at http://localhost:8025. If Mailpit isn't
+running, sign-up still works, the error is logged and the owner can press **Send a new code** once it is.
+For real email, set `Email:Smtp:*` to any SMTP server (Gmail with an app password, or the free tiers of Brevo or
+Mailjet). With no SMTP host, nothing is sent and nothing sensitive is logged, unless `Email:LogMessages` is on.
 
 **Phone numbers are not verified.** Proving someone owns a number needs an SMS or WhatsApp provider, and none
 of those are free beyond trials, so customer phones only get a format check.
@@ -261,7 +279,8 @@ dotnet run --project src/SmartPOS.API -- reset-password --email you@example.com
 - Refunds/returns and sale voiding are not implemented. `Sales.Status` already has `Cancelled` (and
   `Pending`), and reports ignore anything but `Completed`, but nothing sets them yet.
 - **No staff accounts.** One login per shop owner; there is no way to give an employee their own login or limit what they can do. Currency and time zone are global settings, not per shop.
-- **Email is verified by link but not enforced**: an unconfirmed account can use everything. There is **no self-service password reset or change-password screen** yet (use the `reset-password` command above in Development). Phone numbers are only format-checked.
+- There is **no self-service password reset or change-password screen** yet (use the `reset-password` command above in Development).
+- **Customer phones must be Indian mobile numbers**: 10 digits starting with 6, 7, 8 or 9; `+91`, `91` or `0` in front and spaces or hyphens are accepted, and the number is stored as the bare 10 digits (so `+91 98765 43210` and `9876543210` are the same customer). Landlines and other countries' numbers are refused. The format is checked, but nobody proves they own the number (that needs an SMS provider).
 - Loyalty points have no expiry or tiers, and are not reversed on a cancelled bill because there is no cancel feature.
 - **No tax.** Bills carry no tax (GST/VAT); adding it back would need a new migration and a tax line on the
   POS and the bill. Sale-level discount only (it is split across lines, but there are no per-line

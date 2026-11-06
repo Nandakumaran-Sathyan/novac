@@ -440,12 +440,18 @@ namespace SmartPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<int>("EmailVerificationAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EmailVerificationCodeHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime?>("EmailVerificationExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("EmailVerificationTokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                    b.Property<DateTime?>("EmailVerificationSentAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("EmailVerifiedAt")
                         .HasColumnType("timestamp with time zone");

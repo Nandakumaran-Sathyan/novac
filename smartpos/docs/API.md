@@ -11,12 +11,15 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 
 ## Endpoints
 
+Until the email is verified, every other endpoint answers **403** with a problem+json body whose title is
+`Email not verified`. `/api/auth/login`, `/api/auth/register` and `/health` are public.
+
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/auth/login` | Public. `{ email, password }` → `{ accessToken, expiresAt, user }`. Rate limited. |
-| POST | `/api/auth/verify-email` | Public. `{ token }` from the emailed link → 204; 400 if it is wrong, used, replaced or expired. |
-| POST | `/api/auth/resend-verification` | Emails the signed-in user a new link (replacing the old one); 400 if already verified. Rate limited. |
-| POST | `/api/auth/register` | Public. `{ fullName, email, password, shopName, shopAddress? }` → 201 with the same body as login. Creates the user and the shop they own and emails a verification link; 409 if the email is taken; 400 for a throwaway-mailbox domain or a domain that cannot receive mail. Rate limited. |
+| POST | `/api/auth/verify-email` | Signed in (verified or not). `{ code }`, the 6 digits from the email → 204 (also if already verified); 400 if the format is wrong, the code is wrong ("N tries left"), expired (5 minutes) or out of tries (5). Rate limited. |
+| POST | `/api/auth/resend-verification` | Signed in (verified or not). Emails a new code, replacing the old one and resetting the tries; 429 within a minute of the last code; 400 if already verified. Rate limited. |
+| POST | `/api/auth/register` | Public. `{ fullName, email, password, shopName, shopAddress? }` → 201 with the same body as login. Creates the user and the shop they own and emails a verification code; 409 if the email is taken; 400 for a throwaway-mailbox domain or a domain that cannot receive mail. Rate limited. |
 | GET | `/api/auth/me` | Current user profile |
 | GET | `/api/dashboard/summary` | Today's totals, counts, recent sales, low-stock list |
 | GET | `/api/dashboard/insights` | `days` (1–180, default 30). Sales analytics for the last N store days: KPIs with the previous N days for comparison (revenue, bills, average bill, items sold, customers, gross profit), a daily series with the matching previous-period day, a weekday × hour bill-count heatmap, payment mix, net sales by category, top products and customers, and customer vs walk-in bills. Completed bills only; days, weekdays and hours are in the store time zone. 400 outside 1–180 |
@@ -27,10 +30,10 @@ Date filters (`from`, `to`) are calendar dates (`yyyy-MM-dd`), inclusive, in the
 | PUT | `/api/products/{id}` | Full replace of details/prices/threshold/lead time/minimum order/active flag (not stock); omitted optional fields are cleared, omitted lead time and minimum order reset to 3 and 1 |
 | DELETE | `/api/products/{id}` | 204; 409 if the product has sales |
 | GET | `/api/categories` | Distinct category names in use, with product counts (a category exists once a product uses it) |
-| GET | `/api/customers` | `search` (name or phone), paging |
+| GET | `/api/customers` | `search` (name or phone; a phone can be typed with `+91`, spaces or `-`), paging |
 | GET | `/api/customers/{id}` | One customer |
-| POST | `/api/customers` | `{ name, phone }` → 201; 409 if the phone is taken in this shop |
-| PUT | `/api/customers/{id}` | `{ name, phone }` |
+| POST | `/api/customers` | `{ name, phone }` → 201; 409 if the phone is taken in this shop. `phone` must be an Indian mobile: 10 digits starting 6-9, optionally `+91`, `91` or `0` in front, spaces or `-` allowed (400 otherwise); it is stored as the bare 10 digits |
+| PUT | `/api/customers/{id}` | `{ name, phone }`, same phone rule |
 | GET | `/api/inventory` | `search`, `filter` (`All`/`Low`/`OutOfStock`), `category`, paging |
 | POST | `/api/inventory/adjustments` | `{ productId, quantityChange, reason }` → 201; 409 if stock would go negative |
 | GET | `/api/inventory/movements` | `productId`, `type`, `from`, `to`, paging |

@@ -17,6 +17,10 @@ export class CustomersService {
     return this.http.get<PagedResult<Customer>>(this.url, { params: toHttpParams(query) });
   }
 
+  get(id: number) {
+    return this.http.get<Customer>(`${this.url}/${id}`);
+  }
+
   create(input: CustomerInput) {
     return this.http.post<Customer>(this.url, input);
   }

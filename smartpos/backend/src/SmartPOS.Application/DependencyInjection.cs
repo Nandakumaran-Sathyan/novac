@@ -32,9 +32,6 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(LoyaltyOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-        services.AddOptions<AppOptions>()
-            .Bind(configuration.GetSection(AppOptions.SectionName))
-            .ValidateDataAnnotations();
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<StoreCalendar>();

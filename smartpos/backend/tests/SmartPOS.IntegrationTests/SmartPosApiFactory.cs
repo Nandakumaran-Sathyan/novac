@@ -19,7 +19,7 @@ using SmartPOS.Infrastructure.Persistence;
 
 namespace SmartPOS.IntegrationTests;
 
-/// <summary>Collects emails instead of sending them, so tests can read the verification link.</summary>
+/// <summary>Collects emails instead of sending them, so tests can read the verification code.</summary>
 public sealed class FakeEmailSender : IEmailSender
 {
     public ConcurrentQueue<(string To, string Subject, string Body)> Sent { get; } = new();
@@ -140,7 +140,6 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Assistant:RequestsPerMinute", "1000"); // one dedicated test lowers it
         builder.UseSetting("Pos:MaxDiscountPercent", "50");
         builder.UseSetting("Forecasting:ServiceKey", ForecastingKey);
-        builder.UseSetting("App:WebBaseUrl", "https://pos.test");
 
         builder.ConfigureServices(services =>
         {
@@ -176,8 +175,8 @@ public sealed class SmartPosApiFactory : WebApplicationFactory<Program>, IAsyncL
         OtherShopId = otherShop.Id;
 
         db.Users.AddRange(
-            new User { ShopId = shop.Id, FullName = "Test Owner", Email = UserEmail, PasswordHash = hasher.Hash(UserPassword), CreatedAt = now, UpdatedAt = now },
-            new User { ShopId = otherShop.Id, FullName = "Other Owner", Email = OtherEmail, PasswordHash = hasher.Hash(OtherPassword), CreatedAt = now, UpdatedAt = now });
+            new User { ShopId = shop.Id, FullName = "Test Owner", Email = UserEmail, PasswordHash = hasher.Hash(UserPassword), EmailVerifiedAt = now, CreatedAt = now, UpdatedAt = now },
+            new User { ShopId = otherShop.Id, FullName = "Other Owner", Email = OtherEmail, PasswordHash = hasher.Hash(OtherPassword), EmailVerifiedAt = now, CreatedAt = now, UpdatedAt = now });
         await db.SaveChangesAsync();
     }
 

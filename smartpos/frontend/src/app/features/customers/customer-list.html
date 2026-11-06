@@ -82,8 +82,9 @@
       </div>
       <div class="field">
         <label for="customer-phone" class="required">Phone</label>
-        <input id="customer-phone" type="tel" class="input" formControlName="phone" autocomplete="off" [attr.aria-invalid]="invalid('phone')" aria-describedby="phone-help">
-        <span id="phone-help" class="hint" [class.field-error]="invalid('phone')">7–20 digits; spaces, “+”, “-” and brackets are allowed. Each phone number can belong to one customer.</span>
+        <input id="customer-phone" type="tel" inputmode="tel" maxlength="16" class="input" formControlName="phone" autocomplete="off"
+               placeholder="98765 43210" [attr.aria-invalid]="invalid('phone')" aria-describedby="phone-help">
+        <span id="phone-help" class="hint" [class.field-error]="invalid('phone')">10-digit Indian mobile number starting with 6, 7, 8 or 9. “+91” or “0” in front, spaces and “-” are fine. Each number can belong to one customer.</span>
       </div>
     </div>
     <div class="modal-footer">

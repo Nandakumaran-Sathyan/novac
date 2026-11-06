@@ -41,19 +41,6 @@ public sealed class LoyaltyOptions
     public decimal PointValue { get; set; } = 1;
 }
 
-/// <summary>Bound from the "App" configuration section.</summary>
-public sealed class AppOptions
-{
-    public const string SectionName = "App";
-
-    /// <summary>Public address of the web app, used to build links in emails (e.g. https://pos.example.com). Empty disables emailed links.</summary>
-    public string WebBaseUrl { get; set; } = string.Empty;
-
-    /// <summary>How long an email-verification link stays valid.</summary>
-    [Range(1, 24 * 14)]
-    public int EmailVerificationHours { get; set; } = 24;
-}
-
 /// <summary>Bound from the "Pos" configuration section.</summary>
 public sealed class PosOptions
 {

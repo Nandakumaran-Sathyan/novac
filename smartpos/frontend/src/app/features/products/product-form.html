@@ -95,12 +95,15 @@
             <span class="hint">Optional, for perishable goods.</span>
           </div>
 
-          <div class="field">
-            <label for="leadTimeDays" class="required">Supplier lead time (days)</label>
-            <input id="leadTimeDays" type="number" inputmode="numeric" min="1" max="90" step="1" class="input" formControlName="leadTimeDays" [attr.aria-invalid]="invalid('leadTimeDays')" aria-describedby="lead-help">
-            @if (invalid('leadTimeDays')) { <span class="field-error">Enter a whole number of days from 1 to 90.</span> }
-            @else { <span id="lead-help" class="hint">Days from placing an order to receiving it. Forecasting uses it to time reorders.</span> }
-          </div>
+          @if (isEdit()) {
+            <!-- New products always start at the default of 3 days; it can be changed here afterwards. -->
+            <div class="field">
+              <label for="leadTimeDays" class="required">Supplier lead time (days)</label>
+              <input id="leadTimeDays" type="number" inputmode="numeric" min="1" max="90" step="1" class="input" formControlName="leadTimeDays" [attr.aria-invalid]="invalid('leadTimeDays')" aria-describedby="lead-help">
+              @if (invalid('leadTimeDays')) { <span class="field-error">Enter a whole number of days from 1 to 90.</span> }
+              @else { <span id="lead-help" class="hint">Days from placing an order to receiving it. Forecasting uses it to time reorders.</span> }
+            </div>
+          }
 
           <div class="field">
             <label for="minimumOrderQuantity" class="required">Minimum order quantity</label>

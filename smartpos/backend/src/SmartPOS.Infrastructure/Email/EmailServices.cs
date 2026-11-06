@@ -41,7 +41,7 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
 
 /// <summary>
 /// Development stand-in used when no SMTP server is configured and Email:LogMessages is on: writes the whole
-/// email, including its verification link, to the log. The link is a credential, so this is never enabled by default.
+/// email, including its verification code, to the log. The code is a credential, so this is never enabled by default.
 /// </summary>
 public sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEmailSender
 {
@@ -52,7 +52,7 @@ public sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEm
     }
 }
 
-/// <summary>Used when nothing is configured: says so in the log, without printing the message (it contains a credential).</summary>
+/// <summary>Used when nothing is configured: says so in the log, without printing the message (it may contain a verification code).</summary>
 public sealed class NullEmailSender(ILogger<NullEmailSender> logger) : IEmailSender
 {
     public Task SendAsync(string to, string subject, string body, CancellationToken cancellationToken)

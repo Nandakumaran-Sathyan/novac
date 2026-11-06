@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { settingsResolver } from './core/api/settings.service';
-import { authGuard, guestGuard } from './core/auth/auth.guards';
+import { authGuard, guestGuard, unverifiedGuard, verifiedGuard } from './core/auth/auth.guards';
 import { Shell } from './layout/shell';
 
 // Feature pages are lazy-loaded so the login screen downloads only what it needs.
@@ -14,6 +14,7 @@ export const routes: Routes = [
   {
     path: 'verify-email',
     title: 'Verify email',
+    canActivate: [unverifiedGuard],
     loadComponent: () => import('./features/auth/verify-email').then((m) => m.VerifyEmail),
   },
   {
@@ -25,7 +26,7 @@ export const routes: Routes = [
   {
     path: '',
     component: Shell,
-    canActivate: [authGuard],
+    canActivate: [authGuard, verifiedGuard],
     resolve: { settings: settingsResolver },
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },

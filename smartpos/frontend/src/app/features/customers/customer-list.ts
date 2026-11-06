@@ -13,8 +13,8 @@ import { Modal } from '../../shared/components/modal';
 import { Pagination } from '../../shared/components/pagination';
 import { EmptyState, ErrorAlert, Loading } from '../../shared/components/states';
 
-/** Same rule as the API's PhoneRules. */
-const PHONE_PATTERN = /^\+?[0-9][0-9 ()-]{5,18}[0-9]$/;
+/** Same rule as the API's PhoneRules: an Indian mobile, 10 digits starting 6-9, optionally +91, 91 or 0 in front. */
+export const PHONE_PATTERN = /^(?:\+91|91|0)?[ -]?[6-9](?:[ -]?[0-9]){9}$/;
 
 @Component({
   selector: 'app-customer-list',

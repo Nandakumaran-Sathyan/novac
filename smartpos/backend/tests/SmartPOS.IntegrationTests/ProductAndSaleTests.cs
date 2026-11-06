@@ -332,6 +332,42 @@ public class ProductAndSaleTests(SmartPosApiFactory factory) : IClassFixture<Sma
     }
 
     [Fact]
+    public async Task Customer_phones_must_be_indian_mobiles_and_every_format_is_the_same_number()
+    {
+        var user = await factory.UserClientAsync();
+        Task<HttpResponseMessage> Create(string phone) => user.PostAsJsonAsync("/api/customers", new { name = "Phone Test", phone });
+
+        var created = await Create("+91 87654-32109");
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var customer = (await created.Content.ReadFromJsonAsync<Application.Customers.CustomerDto>(SmartPosApiFactory.Json))!;
+        Assert.Equal("8765432109", customer.Phone);
+
+        // The same number written differently is a duplicate.
+        foreach (var same in new[] { "8765432109", "918765432109", "08765432109", "87654 32109" })
+            Assert.Equal(HttpStatusCode.Conflict, (await Create(same)).StatusCode);
+
+        foreach (var bad in new[] { "1234567890", "876543210", "+1 415 555 0101", "044 2434 5678" })
+        {
+            var response = await Create(bad);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("Indian mobile number", await response.Content.ReadAsStringAsync());
+        }
+
+        // Searching with +91 or spaces finds it.
+        foreach (var term in new[] { "+91 87654 32109", "87654-321", "8765432109" })
+        {
+            var found = await user.GetFromJsonAsync<Application.Common.PagedResult<Application.Customers.CustomerDto>>(
+                $"/api/customers?search={Uri.EscapeDataString(term)}", SmartPosApiFactory.Json);
+            Assert.Contains(found!.Items, c => c.Id == customer.Id);
+        }
+
+        // Editing applies the same rule.
+        Assert.Equal(HttpStatusCode.BadRequest, (await user.PutAsJsonAsync($"/api/customers/{customer.Id}", new { name = "Phone Test", phone = "12345" })).StatusCode);
+        var edited = await user.PutAsJsonAsync($"/api/customers/{customer.Id}", new { name = "Phone Test", phone = "0 76543 21098" });
+        Assert.Equal("7654321098", (await edited.Content.ReadFromJsonAsync<Application.Customers.CustomerDto>(SmartPosApiFactory.Json))!.Phone);
+    }
+
+    [Fact]
     public async Task Sale_can_be_linked_to_a_customer_of_the_same_shop()
     {
         var user = await factory.UserClientAsync();

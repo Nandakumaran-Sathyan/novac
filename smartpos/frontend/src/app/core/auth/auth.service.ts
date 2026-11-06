@@ -27,6 +27,8 @@ export class AuthService {
 
   readonly user = computed(() => this.session()?.user ?? null);
   readonly isAuthenticated = computed(() => this.session() !== null);
+  /** When registration (in this tab) sent the first verification code; the code page counts down from it. */
+  readonly codeSentAt = signal<number | null>(null);
 
   constructor() {
     this.scheduleExpiry();
@@ -46,12 +48,15 @@ export class AuthService {
   register(request: RegisterRequest): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${environment.apiUrl}/auth/register`, request)
-      .pipe(tap((response) => this.setSession(response)));
+      .pipe(tap((response) => {
+        this.codeSentAt.set(Date.now());
+        this.setSession(response);
+      }));
   }
 
-  /** Confirms an email address with the token from the emailed link. */
-  verifyEmail(token: string): Observable<void> {
-    return this.http.post<void>(`${environment.apiUrl}/auth/verify-email`, { token });
+  /** Confirms the signed-in user's email address with the 6-digit code from the verification email. */
+  verifyEmail(code: string): Observable<void> {
+    return this.http.post<void>(`${environment.apiUrl}/auth/verify-email`, { code });
   }
 
   resendVerification(): Observable<void> {

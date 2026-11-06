@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, i
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { debounceTime, distinctUntilChanged, Subscription } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, forkJoin, of, Subscription } from 'rxjs';
 import { CustomersService } from '../../core/api/customers.service';
 import { ProductsService } from '../../core/api/products.service';
 import { SalesService } from '../../core/api/sales.service';
@@ -13,6 +13,7 @@ import { ConfirmService } from '../../core/ui/confirm.service';
 import { Icon } from '../../shared/components/icon';
 import { EmptyState, ErrorAlert, Loading } from '../../shared/components/states';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PosCart } from './pos-cart';
 import { addProduct, calculateTotals, CartLine, lineTotal, maxRedeemablePoints, pointsValue, removeLine, setQuantity } from './cart';
 
 @Component({
@@ -30,6 +31,7 @@ export class Pos implements OnInit {
   private readonly confirm = inject(ConfirmService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly settings = inject(SettingsService);
+  private readonly cart = inject(PosCart);
 
   private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
   private searchRequest?: Subscription;
@@ -40,21 +42,20 @@ export class Pos implements OnInit {
   protected readonly loadingProducts = signal(true);
   protected readonly productsError = signal<string | null>(null);
 
-  protected readonly lines = signal<CartLine[]>([]);
-  protected readonly discountPercent = signal(0);
-  protected readonly paymentMethod = signal<PaymentMethod>('Cash');
+  // The bill in progress lives in PosCart, so it survives leaving this page.
+  protected readonly lines = this.cart.lines;
+  protected readonly discountPercent = this.cart.discountPercent;
+  protected readonly paymentMethod = this.cart.paymentMethod;
   protected readonly paymentMethods: PaymentMethod[] = ['Cash', 'Card', 'UPI', 'Other'];
-  /** Cash handed over by the customer; null means "exact amount". Only used for Cash. */
-  protected readonly amountReceived = signal<number | null>(null);
+  protected readonly amountReceived = this.cart.amountReceived;
 
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
   protected readonly customerMatches = signal<Customer[]>([]);
-  protected readonly customer = signal<Customer | null>(null);
+  protected readonly customer = this.cart.customer;
   protected readonly submitting = signal(false);
   protected readonly checkoutError = signal<string | null>(null);
   protected readonly completedSale = signal<Sale | null>(null);
-  /** Loyalty points the customer wants to spend on this bill. */
-  protected readonly pointsToRedeem = signal(0);
+  protected readonly pointsToRedeem = this.cart.pointsToRedeem;
 
   protected readonly spendPerPoint = computed(() => this.settings.settings()?.loyaltySpendPerPoint ?? 0);
   /** Same rule as the server (LoyaltyRules): floor(total / spend per point), customers only. */
@@ -82,6 +83,7 @@ export class Pos implements OnInit {
   protected readonly totals = computed(() =>
     calculateTotals(this.lines(), this.validDiscount(), this.pointsInvalid() ? 0 : pointsValue(this.pointsToRedeem(), this.pointValue())),
   );
+  protected readonly hasBill = computed(() => this.lines().length > 0 || this.customer() !== null || this.discountPercent() !== 0);
   protected readonly itemCount = computed(() => this.lines().reduce((n, l) => n + l.quantity, 0));
   /** Cash tendered below the total can't be accepted; leaving the box empty means exact payment. */
   protected readonly paymentInvalid = computed(() => {
@@ -108,6 +110,45 @@ export class Pos implements OnInit {
       .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((term) => this.findCustomers(term));
     this.loadProducts();
+    this.refreshLines();
+    this.refreshCustomer();
+  }
+
+  /**
+   * A kept or restored bill may be hours old: bring each line's price, name and stock up to date so the
+   * total shown is what the server will charge. Products that are gone or deactivated are taken off the bill.
+   */
+  private refreshLines(): void {
+    const kept = this.lines();
+    if (kept.length === 0) {
+      return;
+    }
+    forkJoin(kept.map((l) => this.productsApi.get(l.productId).pipe(catchError(() => of(null))))).subscribe((products) => {
+      const fresh = new Map(products.filter((p): p is Product => p !== null && p.isActive).map((p) => [p.id, p]));
+      const removed = kept.filter((l) => !fresh.has(l.productId)).map((l) => l.name);
+      this.lines.update((lines) => lines
+        .filter((l) => fresh.has(l.productId))
+        .map((l) => {
+          const p = fresh.get(l.productId)!;
+          const available = p.stockQuantity;
+          return { ...l, name: p.name, sku: p.sku, unitPrice: p.price, available, quantity: Math.min(l.quantity, Math.max(available, 1)) };
+        }));
+      if (removed.length > 0) {
+        this.checkoutError.set(`Removed from the bill because they are no longer for sale: ${removed.join(', ')}.`);
+      }
+    });
+  }
+
+  /** Coming back to a kept bill: the customer's points may have changed meanwhile (another bill, an edit). */
+  private refreshCustomer(): void {
+    const kept = this.customer();
+    if (!kept) {
+      return;
+    }
+    this.customersApi.get(kept.id).subscribe({
+      next: (fresh) => this.customer()?.id === fresh.id && this.customer.set(fresh),
+      error: () => undefined, // keep what we have; the server re-checks points at checkout
+    });
   }
 
   private findCustomers(term: string): void {
@@ -214,12 +255,12 @@ export class Pos implements OnInit {
   }
 
   protected async clearCart(): Promise<void> {
-    if (this.lines().length === 0) {
+    if (!this.hasBill()) {
       return;
     }
     const ok = await this.confirm.ask({
       title: 'Clear cart?',
-      message: 'All items will be removed from the current sale.',
+      message: 'All items, the customer, the discount and any points will be removed from the current sale.',
       confirmText: 'Clear cart',
       danger: true,
     });
@@ -247,11 +288,7 @@ export class Pos implements OnInit {
         next: (sale) => {
           this.submitting.set(false);
           this.completedSale.set(sale);
-          this.lines.set([]);
-          this.discountPercent.set(0);
-          this.amountReceived.set(null);
-          this.customer.set(null);
-          this.pointsToRedeem.set(0);
+          this.cart.clear(); // the only automatic clear: the bill has been paid
           this.loadProducts(); // refresh stock figures
         },
         error: (err: unknown) => {
@@ -268,12 +305,7 @@ export class Pos implements OnInit {
   }
 
   private resetSale(): void {
-    this.lines.set([]);
-    this.discountPercent.set(0);
-    this.paymentMethod.set('Cash');
-    this.amountReceived.set(null);
-    this.customer.set(null);
-    this.pointsToRedeem.set(0);
+    this.cart.clear();
     this.customerSearch.setValue('', { emitEvent: false });
     this.customerMatches.set([]);
     this.checkoutError.set(null);

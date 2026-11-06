@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using SmartPOS.API.Auth;
 using SmartPOS.API.Infrastructure;
 using SmartPOS.Application.Auth;
 
@@ -36,9 +37,9 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return StatusCode(StatusCodes.Status201Created, response);
     }
 
-    /// <summary>Confirm an email address with the token from the emailed link. Public: the link is opened from a mail client.</summary>
+    /// <summary>Confirm the signed-in user's email address with the 6-digit code that was emailed to them.</summary>
     [HttpPost("verify-email")]
-    [AllowAnonymous]
+    [Authorize(Policy = SmartPosPolicies.SignedIn)]
     [EnableRateLimiting(ApiServiceCollectionExtensions.LoginRateLimitPolicy)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -48,11 +49,13 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Email the signed-in user a new verification link.</summary>
+    /// <summary>Email the signed-in user a new verification code (at most one a minute).</summary>
     [HttpPost("resend-verification")]
+    [Authorize(Policy = SmartPosPolicies.SignedIn)]
     [EnableRateLimiting(ApiServiceCollectionExtensions.LoginRateLimitPolicy)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ResendVerification(CancellationToken cancellationToken)
     {
         await authService.ResendVerificationAsync(cancellationToken);
@@ -61,6 +64,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
 
     /// <summary>The signed-in user's profile. Used by the web app to confirm a stored session.</summary>
     [HttpGet("me")]
+    [Authorize(Policy = SmartPosPolicies.SignedIn)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public Task<UserDto> Me(CancellationToken cancellationToken) => authService.GetCurrentAsync(cancellationToken);

@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using SmartPOS.Application.Common;
 using SmartPOS.Core.Entities;
 
@@ -15,7 +14,7 @@ public sealed class AuthService(
     ISampleDataSeeder sampleDataSeeder,
     IEmailSender emailSender,
     IEmailAddressChecker emailChecker,
-    IOptions<AppOptions> appOptions,
+    IVerificationCodeHasher codeHasher,
     ICurrentUser currentUser,
     StoreCalendar calendar,
     ILogger<AuthService> logger) : IAuthService
@@ -102,21 +101,37 @@ public sealed class AuthService(
 
     public async Task VerifyEmailAsync(VerifyEmailRequest request, CancellationToken cancellationToken)
     {
-        // The token is "<user id>.<random secret>". Only the secret's hash is stored, and the comparison is constant-time.
-        var parts = request.Token.Split('.', 2);
-        var user = parts.Length == 2 && int.TryParse(parts[0], out var userId)
-            ? await db.Users.IgnoreQueryFilters().SingleOrDefaultAsync(u => u.Id == userId, cancellationToken)
-            : null;
+        var user = await db.Users.SingleOrDefaultAsync(u => u.Id == currentUser.UserId, cancellationToken)
+                   ?? throw NotFoundException.For("User", currentUser.UserId);
+        if (user.EmailVerifiedAt is not null)
+            return; // already done (e.g. a double click): nothing to report
 
-        var valid = user?.EmailVerificationTokenHash is { } stored &&
-                    CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(stored), Encoding.ASCII.GetBytes(HashToken(parts[1]))) &&
-                    user.EmailVerificationExpiresAt > calendar.UtcNow;
-        if (!valid)
-            throw new BusinessRuleException("This verification link is invalid or has expired. Sign in and request a new one.");
+        if (user.EmailVerificationCodeHash is null || user.EmailVerificationExpiresAt <= calendar.UtcNow)
+            throw new BusinessRuleException("This code has expired. Request a new one.");
 
-        user!.EmailVerifiedAt ??= calendar.UtcNow;
-        user.EmailVerificationTokenHash = null;
+        // Count the try in the database before checking the code, and only while under the limit. Like the stock
+        // update, the condition and the change are one statement, so parallel guesses can't get past the limit.
+        var counted = await db.Users
+            .Where(u => u.Id == user.Id && u.EmailVerificationAttempts < EmailVerificationRules.MaxAttempts)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailVerificationAttempts, u => u.EmailVerificationAttempts + 1), cancellationToken);
+        if (counted == 0)
+            throw new BusinessRuleException("Too many wrong codes. Request a new one.");
+
+        var expected = Encoding.ASCII.GetBytes(user.EmailVerificationCodeHash);
+        var actual = Encoding.ASCII.GetBytes(codeHasher.Hash(user.Id, request.Code));
+        if (!CryptographicOperations.FixedTimeEquals(expected, actual))
+        {
+            var left = Math.Max(EmailVerificationRules.MaxAttempts - user.EmailVerificationAttempts - 1, 0);
+            logger.LogInformation("Wrong verification code for user {UserId}", user.Id);
+            throw new BusinessRuleException(left > 0
+                ? $"That code is not correct. {left} {(left == 1 ? "try" : "tries")} left."
+                : "That code is not correct, and that was the last try. Request a new one.");
+        }
+
+        user.EmailVerifiedAt = calendar.UtcNow;
+        user.EmailVerificationCodeHash = null;
         user.EmailVerificationExpiresAt = null;
+        user.EmailVerificationAttempts = 0;
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("User {UserId} verified their email", user.Id);
     }
@@ -127,6 +142,9 @@ public sealed class AuthService(
                    ?? throw NotFoundException.For("User", currentUser.UserId);
         if (user.EmailVerifiedAt is not null)
             throw new BusinessRuleException("Your email address is already verified.");
+        var wait = user.EmailVerificationSentAt + EmailVerificationRules.ResendCooldown - calendar.UtcNow;
+        if (wait > TimeSpan.Zero)
+            throw new TooManyRequestsException($"A code was just sent. You can ask for another in {Math.Ceiling(wait.Value.TotalSeconds):0} seconds.");
         await SendVerificationAsync(user, cancellationToken);
     }
 
@@ -147,32 +165,28 @@ public sealed class AuthService(
             logger.LogWarning("Could not check mail servers for {Domain}; allowing the registration", domain);
     }
 
-    /// <summary>Issues a fresh single-use token and emails the link. A mail failure is logged, never fatal: the user can resend.</summary>
+    /// <summary>Issues a fresh code (replacing any earlier one) and emails it. A mail failure is logged, never fatal: the user can resend.</summary>
     private async Task SendVerificationAsync(User user, CancellationToken cancellationToken)
     {
-        var options = appOptions.Value;
-        var secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        user.EmailVerificationTokenHash = HashToken(secret);
-        user.EmailVerificationExpiresAt = calendar.UtcNow.AddHours(options.EmailVerificationHours);
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        var now = calendar.UtcNow;
+        user.EmailVerificationCodeHash = codeHasher.Hash(user.Id, code);
+        user.EmailVerificationExpiresAt = now + EmailVerificationRules.CodeLifetime;
+        user.EmailVerificationAttempts = 0;
+        user.EmailVerificationSentAt = now;
         await db.SaveChangesAsync(cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(options.WebBaseUrl))
-        {
-            logger.LogWarning("App:WebBaseUrl is not set, so no verification link can be emailed to user {UserId}", user.Id);
-            return;
-        }
-        var link = $"{options.WebBaseUrl.TrimEnd('/')}/verify-email?token={user.Id}.{secret}";
-        var body = $"Hi {user.FullName},\n\nConfirm your email address for SmartPOS by opening this link:\n{link}\n\n" +
-                   $"It works once and expires in {options.EmailVerificationHours} hours. If you didn't create an account, you can ignore this email.";
+        var minutes = (int)EmailVerificationRules.CodeLifetime.TotalMinutes;
+        var body = $"Hi {user.FullName},\n\nYour SmartPOS verification code is:\n\n    {code}\n\n" +
+                   $"Enter it on the verification screen. It expires in {minutes} minutes and can be tried {EmailVerificationRules.MaxAttempts} times.\n" +
+                   "If you didn't create a SmartPOS account, you can ignore this email.";
         try
         {
-            await emailSender.SendAsync(user.Email, "Confirm your SmartPOS email address", body, cancellationToken);
+            await emailSender.SendAsync(user.Email, "Your SmartPOS verification code", body, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Could not send the verification email to user {UserId}", user.Id);
         }
     }
-
-    private static string HashToken(string secret) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
 }

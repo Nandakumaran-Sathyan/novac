@@ -26,3 +26,23 @@ public interface ITokenService
 {
     (string Token, DateTime ExpiresAt) CreateToken(User user);
 }
+
+/// <summary>
+/// Hashes email verification codes with a server-side key. A plain hash of a 6-digit code could be reversed by
+/// trying all million codes; a keyed hash can't be without the key. The user id is mixed in, so one user's
+/// code is useless for another.
+/// </summary>
+public interface IVerificationCodeHasher
+{
+    string Hash(int userId, string code);
+}
+
+/// <summary>The rules for email verification codes.</summary>
+public static class EmailVerificationRules
+{
+    public const int CodeLength = 6;
+    public const int MaxAttempts = 5;
+    public static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan ResendCooldown = TimeSpan.FromSeconds(60);
+    public const string CodePattern = @"^\d{6}$";
+}

@@ -13,6 +13,14 @@ public static class SmartPosClaims
     public const string Name = JwtRegisteredClaimNames.Name;
     public const string Email = JwtRegisteredClaimNames.Email;
     public const string ShopId = "shop";
+    /// <summary>Added on each request from the database (never put in the token), so verifying takes effect at once.</summary>
+    public const string EmailVerified = "email_verified";
+}
+
+public static class SmartPosPolicies
+{
+    /// <summary>Signed in, email verified or not: only the endpoints an unverified user needs to finish verifying.</summary>
+    public const string SignedIn = "signed-in";
 }
 
 public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider) : ITokenService

@@ -45,7 +45,7 @@
   <aside class="cart card" aria-labelledby="cart-heading">
     <div class="card-header">
       <h2 id="cart-heading">Current sale <span class="muted">({{ itemCount() }} {{ itemCount() === 1 ? 'item' : 'items' }})</span></h2>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="clearCart()" [disabled]="lines().length === 0">Clear</button>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="clearCart()" [disabled]="!hasBill()"><app-icon name="trash" [size]="14" /> Clear cart</button>
     </div>
 
     @if (completedSale(); as sale) {

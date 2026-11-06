@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SmartPOS.Application.Auth;
 
 namespace SmartPOS.IntegrationTests;
@@ -61,11 +63,12 @@ public class AuthAndAuthorizationTests(SmartPosApiFactory factory) : IClassFixtu
         Assert.Equal("Fresh Shop", login.User.ShopName);
         Assert.Equal("fresh.owner@test.local", login.User.Email); // stored lower-case
 
-        // The token works, and the new shop starts empty and separate from the others.
+        // The token works, and once the email is verified the new shop starts empty and separate from the others.
         var client = await factory.CreateClientAsAsync("fresh.owner@test.local", "Registered123");
         var me = await client.GetFromJsonAsync<UserDto>("/api/auth/me", SmartPosApiFactory.Json);
         Assert.Equal(login.User.ShopId, me!.ShopId);
         Assert.NotEqual(factory.ShopId, me.ShopId);
+        await VerifyAsync(client, "fresh.owner@test.local");
         var products = await client.GetStringAsync("/api/products");
         Assert.Contains("\"totalCount\":0", products);
     }
@@ -104,80 +107,197 @@ public class AuthAndAuthorizationTests(SmartPosApiFactory factory) : IClassFixtu
 
     // ---- email validation and verification ------------------------------------------------------------
 
-    private static string TokenFrom((string To, string Subject, string Body) mail) =>
-        Regex.Match(mail.Body, @"token=(\S+)").Groups[1].Value;
+    private static string CodeFrom((string To, string Subject, string Body) mail) =>
+        Regex.Match(mail.Body, @"\b(\d{6})\b").Groups[1].Value;
 
     private (string To, string Subject, string Body) LastMailTo(string email) =>
         factory.Mail.Sent.Last(m => m.To == email);
 
+    private async Task<HttpClient> RegisterAsync(string email)
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop(email));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return await factory.CreateClientAsAsync(email, "Registered123");
+    }
+
+    private async Task VerifyAsync(HttpClient client, string email)
+    {
+        var response = await client.PostAsJsonAsync("/api/auth/verify-email", new { code = CodeFrom(LastMailTo(email)) });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> TryCodeAsync(HttpClient client, string code) =>
+        client.PostAsJsonAsync("/api/auth/verify-email", new { code });
+
+    /// <summary>Edits the user's row directly, to stand in for time passing.</summary>
+    private async Task UpdateUserAsync(string email, Action<SmartPOS.Core.Entities.User> change)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SmartPOS.Infrastructure.Persistence.SmartPosDbContext>();
+        var user = await db.Users.IgnoreQueryFilters().SingleAsync(u => u.Email == email);
+        change(user);
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<SmartPOS.Core.Entities.User> UserAsync(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SmartPOS.Infrastructure.Persistence.SmartPosDbContext>();
+        return await db.Users.IgnoreQueryFilters().AsNoTracking().SingleAsync(u => u.Email == email);
+    }
+
     [Fact]
-    public async Task Registering_sends_a_verification_link_and_the_account_starts_unverified()
+    public async Task Registering_emails_a_six_digit_code_and_stores_only_a_keyed_hash()
     {
         var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("verify.me@test.local"));
         var login = (await response.Content.ReadFromJsonAsync<LoginResponse>(SmartPosApiFactory.Json))!;
         Assert.False(login.User.EmailVerified);
 
-        var mail = LastMailTo("verify.me@test.local");
-        Assert.StartsWith("https://pos.test/verify-email?token=" + login.User.Id + ".", mail.Body.Split('\n').First(l => l.StartsWith("https://")));
+        var code = CodeFrom(LastMailTo("verify.me@test.local"));
+        Assert.Matches(@"^\d{6}$", code);
+        var user = await UserAsync("verify.me@test.local");
+        Assert.Equal(64, user.EmailVerificationCodeHash!.Length);
+        Assert.DoesNotContain(code, user.EmailVerificationCodeHash);
+        // Not a plain SHA-256 of the code either: that could be reversed by trying all million codes.
+        Assert.NotEqual(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(code))),
+            user.EmailVerificationCodeHash);
+        Assert.InRange(user.EmailVerificationExpiresAt!.Value - DateTime.UtcNow, TimeSpan.FromMinutes(4), TimeSpan.FromMinutes(5));
     }
 
     [Fact]
-    public async Task The_emailed_token_verifies_the_address_once_and_only_once()
+    public async Task An_unverified_account_can_only_reach_its_profile_and_the_verification_endpoints()
     {
-        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("once@test.local"));
-        var token = TokenFrom(LastMailTo("once@test.local"));
+        var client = await RegisterAsync("blocked@test.local");
 
-        Assert.Equal(HttpStatusCode.NoContent, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token })).StatusCode);
-        var client = await factory.CreateClientAsAsync("once@test.local", "Registered123");
+        foreach (var path in new[] { "/api/products", "/api/sales", "/api/customers", "/api/dashboard/summary", "/api/settings/pos", "/api/forecasting/status", "/api/ai/status" })
+        {
+            var response = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            Assert.Contains("Email not verified", await response.Content.ReadAsStringAsync());
+        }
+        var sale = await client.PostAsJsonAsync("/api/sales", new { items = new[] { new { productId = 1, quantity = 1 } } });
+        Assert.Equal(HttpStatusCode.Forbidden, sale.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+
+        // The same token works as soon as the code is entered: the check reads the database on each request.
+        await VerifyAsync(client, "blocked@test.local");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products")).StatusCode);
         Assert.True((await client.GetFromJsonAsync<UserDto>("/api/auth/me", SmartPosApiFactory.Json))!.EmailVerified);
+    }
 
-        // The same link cannot be used again.
-        Assert.Equal(HttpStatusCode.BadRequest, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token })).StatusCode);
+    [Fact]
+    public async Task The_code_works_once()
+    {
+        var client = await RegisterAsync("once@test.local");
+        var code = CodeFrom(LastMailTo("once@test.local"));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await TryCodeAsync(client, code)).StatusCode);
+        var user = await UserAsync("once@test.local");
+        Assert.NotNull(user.EmailVerifiedAt);
+        Assert.Null(user.EmailVerificationCodeHash);
+        // A repeat (double click) is harmless.
+        Assert.Equal(HttpStatusCode.NoContent, (await TryCodeAsync(client, code)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Five_tries_then_even_the_right_code_is_refused()
+    {
+        var client = await RegisterAsync("guesser@test.local");
+        var code = CodeFrom(LastMailTo("guesser@test.local"));
+        var wrong = code == "000000" ? "111111" : "000000";
+
+        var first = await TryCodeAsync(client, wrong);
+        Assert.Equal(HttpStatusCode.BadRequest, first.StatusCode);
+        Assert.Contains("4 tries left", await first.Content.ReadAsStringAsync());
+        for (var i = 0; i < 3; i++)
+            await TryCodeAsync(client, wrong);
+        Assert.Contains("last try", await (await TryCodeAsync(client, wrong)).Content.ReadAsStringAsync());
+
+        var right = await TryCodeAsync(client, code);
+        Assert.Equal(HttpStatusCode.BadRequest, right.StatusCode);
+        Assert.Contains("Too many wrong codes", await right.Content.ReadAsStringAsync());
+        Assert.Null((await UserAsync("guesser@test.local")).EmailVerifiedAt);
+        Assert.Equal(5, (await UserAsync("guesser@test.local")).EmailVerificationAttempts);
+    }
+
+    [Fact]
+    public async Task Parallel_guesses_cannot_get_past_five_tries()
+    {
+        var client = await RegisterAsync("parallel@test.local");
+        var code = CodeFrom(LastMailTo("parallel@test.local"));
+        var wrong = code == "000000" ? "111111" : "000000";
+
+        await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => TryCodeAsync(client, wrong)));
+
+        Assert.Equal(5, (await UserAsync("parallel@test.local")).EmailVerificationAttempts);
+        Assert.Equal(HttpStatusCode.BadRequest, (await TryCodeAsync(client, code)).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_expired_code_is_refused()
+    {
+        var client = await RegisterAsync("late@test.local");
+        var code = CodeFrom(LastMailTo("late@test.local"));
+        await UpdateUserAsync("late@test.local", u => u.EmailVerificationExpiresAt = DateTime.UtcNow.AddSeconds(-1));
+
+        var response = await TryCodeAsync(client, code);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("expired", await response.Content.ReadAsStringAsync());
     }
 
     [Theory]
-    [InlineData("nonsense-token-that-is-long-enough")]
-    [InlineData("1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
-    [InlineData("999999.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
-    public async Task A_wrong_token_does_not_verify_anything(string token)
+    [InlineData("12345")]
+    [InlineData("1234567")]
+    [InlineData("12a456")]
+    [InlineData("")]
+    public async Task A_code_must_be_six_digits(string code)
     {
-        var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token });
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var client = await RegisterAsync($"format{code.Length}{code}@test.local");
+        Assert.Equal(HttpStatusCode.BadRequest, (await TryCodeAsync(client, code)).StatusCode);
+        Assert.Equal(0, (await UserAsync($"format{code.Length}{code}@test.local")).EmailVerificationAttempts);
     }
 
     [Fact]
-    public async Task A_token_for_one_user_cannot_verify_another()
+    public async Task One_users_code_cannot_verify_another()
     {
-        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("alice@test.local"));
-        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("bob@test.local"));
-        var alice = TokenFrom(LastMailTo("alice@test.local"));
-        var bobId = alice.Split('.')[0] == TokenFrom(LastMailTo("bob@test.local")).Split('.')[0] ? "x" : TokenFrom(LastMailTo("bob@test.local")).Split('.')[0];
+        await RegisterAsync("alice@test.local");
+        var bob = await RegisterAsync("bob@test.local");
+        var alices = CodeFrom(LastMailTo("alice@test.local"));
+        if (alices == CodeFrom(LastMailTo("bob@test.local")))
+            return; // one in a million: the same code by chance proves nothing either way
 
-        // Bob's id with Alice's secret.
-        var forged = bobId + "." + alice.Split('.')[1];
-        Assert.Equal(HttpStatusCode.BadRequest, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token = forged })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await TryCodeAsync(bob, alices)).StatusCode);
+        Assert.Null((await UserAsync("bob@test.local")).EmailVerifiedAt);
     }
 
     [Fact]
-    public async Task Resending_replaces_the_old_link_and_stops_once_verified()
+    public async Task Resending_waits_a_minute_then_replaces_the_code_and_resets_the_tries()
     {
-        await factory.CreateClient().PostAsJsonAsync("/api/auth/register", NewShop("resend@test.local"));
-        var first = TokenFrom(LastMailTo("resend@test.local"));
-        var client = await factory.CreateClientAsAsync("resend@test.local", "Registered123");
+        var client = await RegisterAsync("resend@test.local");
+        var first = CodeFrom(LastMailTo("resend@test.local"));
+        var wrong = first == "000000" ? "111111" : "000000";
+        await TryCodeAsync(client, wrong);
 
+        var tooSoon = await client.PostAsync("/api/auth/resend-verification", null);
+        Assert.Equal(HttpStatusCode.TooManyRequests, tooSoon.StatusCode);
+        Assert.Contains("seconds", await tooSoon.Content.ReadAsStringAsync());
+
+        await UpdateUserAsync("resend@test.local", u => u.EmailVerificationSentAt = DateTime.UtcNow.AddMinutes(-2));
         Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/auth/resend-verification", null)).StatusCode);
-        var second = TokenFrom(LastMailTo("resend@test.local"));
-        Assert.NotEqual(first, second);
-        Assert.Equal(HttpStatusCode.BadRequest, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token = first })).StatusCode);
+        var second = CodeFrom(LastMailTo("resend@test.local"));
+        Assert.Equal(0, (await UserAsync("resend@test.local")).EmailVerificationAttempts);
 
-        Assert.Equal(HttpStatusCode.NoContent, (await factory.CreateClient().PostAsJsonAsync("/api/auth/verify-email", new { token = second })).StatusCode);
+        if (second != first)
+            Assert.Equal(HttpStatusCode.BadRequest, (await TryCodeAsync(client, first)).StatusCode);
+        await VerifyAsync(client, "resend@test.local");
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/auth/resend-verification", null)).StatusCode);
     }
 
     [Fact]
-    public async Task Resending_needs_a_signed_in_user()
+    public async Task Verifying_and_resending_need_a_signed_in_user()
     {
         Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().PostAsync("/api/auth/resend-verification", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await TryCodeAsync(factory.CreateClient(), "123456")).StatusCode);
     }
 
     [Theory]

@@ -2,7 +2,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -30,6 +33,7 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<ICurrentShop, CurrentShop>();
+        services.AddSingleton<IVerificationCodeHasher, VerificationCodeHasher>();
 
         services.AddJwtAuthentication();
         services.AddSwagger();
@@ -123,18 +127,25 @@ public static class ApiServiceCollectionExtensions
                         var db = context.HttpContext.RequestServices.GetRequiredService<IApplicationDbContext>();
                         // The request has no authenticated user yet, so the shop query filter would match
                         // nothing: switch it off and check the shop claim explicitly instead.
-                        var stillValid = await db.Users.IgnoreQueryFilters().AsNoTracking()
-                            .AnyAsync(u => u.Id == userId && u.ShopId == shopId,
-                                context.HttpContext.RequestAborted);
-                        if (!stillValid)
+                        var user = await db.Users.IgnoreQueryFilters().AsNoTracking()
+                            .Where(u => u.Id == userId && u.ShopId == shopId)
+                            .Select(u => new { Verified = u.EmailVerifiedAt != null })
+                            .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+                        if (user is null)
                             context.Fail("User no longer exists.");
+                        else if (user.Verified)
+                            ((ClaimsIdentity)principal.Identity!).AddClaim(new Claim(SmartPosClaims.EmailVerified, "true"));
                     }
                 };
             });
 
-        // Secure by default: every endpoint requires a signed-in user unless marked [AllowAnonymous].
+        // Secure by default: every endpoint requires a signed-in user with a verified email unless marked
+        // [AllowAnonymous] or the SignedIn policy (sign-in status and the verification endpoints).
         services.AddAuthorizationBuilder()
-            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser()
+                .RequireClaim(SmartPosClaims.EmailVerified, "true").Build())
+            .AddPolicy(SmartPosPolicies.SignedIn, p => p.RequireAuthenticatedUser());
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, EmailVerificationResultHandler>();
     }
 
     private static void AddSwagger(this IServiceCollection services)
@@ -178,4 +189,28 @@ public static class ApiServiceCollectionExtensions
             }));
         }
     };
+}
+
+/// <summary>Explains a 403 caused by an unverified email, so the web app can send the user to the code page.</summary>
+public sealed class EmailVerificationResultHandler(IProblemDetailsService problemDetails) : IAuthorizationMiddlewareResultHandler
+{
+    public const string Title = "Email not verified";
+    private readonly AuthorizationMiddlewareResultHandler _default = new();
+
+    public async Task HandleAsync(RequestDelegate next, HttpContext context, AuthorizationPolicy policy, PolicyAuthorizationResult authorizeResult)
+    {
+        var unverified = authorizeResult.Forbidden && authorizeResult.AuthorizationFailure?.FailedRequirements
+            .OfType<ClaimsAuthorizationRequirement>().Any(r => r.ClaimType == SmartPosClaims.EmailVerified) == true;
+        if (!unverified)
+        {
+            await _default.HandleAsync(next, context, policy, authorizeResult);
+            return;
+        }
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await problemDetails.WriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = context,
+            ProblemDetails = { Status = 403, Title = Title, Detail = "Confirm your email address with the code we sent you to use SmartPOS." }
+        });
+    }
 }
